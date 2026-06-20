@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Platform, Text } from "react-native";
 import { ThemeModeProvider, useThemeMode } from "../utils/themeMode";
 
 export default function Layout() {
@@ -14,49 +15,59 @@ export default function Layout() {
 
 function ThemedTabs() {
   const { palette } = useThemeMode();
+  const insets = useSafeAreaInsets();
+  const bottomSafePadding = Platform.OS === "web" ? 20 : Math.max(12, insets.bottom + 8);
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: palette.accentBright,
         tabBarInactiveTintColor: palette.muted,
         tabBarStyle: {
           backgroundColor: palette.header,
           borderTopColor: palette.border,
-          height: 62,
-          paddingBottom: 8,
+          height: 62 + bottomSafePadding,
+          paddingBottom: bottomSafePadding,
           paddingTop: 8,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "700",
-        },
-        tabBarIcon: () => null,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Scan/Search",
+          tabBarIcon: () => (
+            <Text style={{ color: "#fff", fontSize: 22 }}>🔎</Text>
+          ),
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
           title: "Ninja Hub",
+          tabBarIcon: () => (
+            <Text style={{ color: "#fff", fontSize: 22 }}>🥷</Text>
+          ),
         }}
       />
       <Tabs.Screen
         name="grocery-basket"
         options={{
           title: "Grocery Basket",
+          tabBarIcon: () => (
+            <Text style={{ color: "#fff", fontSize: 22 }}>🧺</Text>
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Diet Profile",
+          tabBarIcon: () => (
+            <Text style={{ color: "#fff", fontSize: 22 }}>📋</Text>
+          ),
         }}
       />
     </Tabs>

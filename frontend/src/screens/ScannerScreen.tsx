@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Image,
   ScrollView,
   StyleSheet,
@@ -9,13 +8,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 
 import ProductDetailScreen from "./ProductDetailScreen";
 import { fetchProduct, searchProducts } from "../services/api";
-import { getHealthScore, getHealthScoreColor } from "../utils/healthScore";
+import { getHealthScore, getHealthScoreColor, getNutriScore, getNutriScoreColor } from "../utils/healthScore";
 import { productSummary, readStore, writeStore, UserProfile } from "../utils/localStore";
 import { useThemeMode } from "../utils/themeMode";
 
@@ -25,6 +25,8 @@ interface Suggestion {
   image: string;
   barcode?: string;
   brand?: string;
+  nutriScore: string;
+  nutriColor: string;
 }
 
 const defaultProfile: UserProfile = {
@@ -58,12 +60,21 @@ export default function ScannerScreen() {
   const [loading, setLoading] = useState(false);
   const [scanEnabled, setScanEnabled] = useState(true);
   const [showCamera, setShowCamera] = useState(false);
+  const isWeb = Platform.OS === "web";
+  const hasCameraPermission = permission?.granted === true;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSearchRef = useRef<string>("");
 
   useEffect(() => {
     if (permission?.granted === false) {
       requestPermission();
     }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
   }, [permission, requestPermission]);
 
   const rememberProduct = (product: any) => {
@@ -109,45 +120,60 @@ export default function ScannerScreen() {
   };
 
   const handleSearch = (text: string) => {
+    const query = text.trim();
     setSearchText(text);
+    latestSearchRef.current = query;
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    if (!text.trim()) {
+    if (!query) {
       setSuggestions([]);
+      setLoading(false);
       return;
     }
 
     searchTimeoutRef.current = setTimeout(async () => {
+      const currentQuery = latestSearchRef.current;
       setLoading(true);
       try {
-        const results = await searchProducts(text);
+        const results = await searchProducts(currentQuery);
+        if (latestSearchRef.current !== currentQuery) {
+          return;
+        }
+
         setSuggestions(
-          results.slice(0, 8).map((product: any, index: number) => ({
-            id: `${product.code || index}`,
-            name: product.product_name || "Unknown product",
-            brand: product.brands || "",
-            image: product.image_front_url || product.image_url || "",
-            barcode: product.code,
-          }))
+          results.slice(0, 8).map((product: any, index: number) => {
+            const nutriScore = getNutriScore(product);
+            return {
+              id: `${product.code || index}`,
+              name: product.product_name || "Unknown product",
+              brand: product.brands || "",
+              image: product.image_front_url || product.image_url || "",
+              barcode: product.code,
+              nutriScore,
+              nutriColor: getNutriScoreColor(nutriScore),
+            };
+          })
         );
       } finally {
-        setLoading(false);
+        if (latestSearchRef.current === currentQuery) {
+          setLoading(false);
+        }
       }
-    }, 450);
+    }, 300);
   };
 
   const handleSelectSuggestion = async (product: Suggestion) => {
-    if (product.barcode) {
-      await openProductByBarcode(product.barcode);
-      setSearchText("");
-      setSuggestions([]);
+    if (!product.barcode) {
+      alert("This item cannot be opened because it has no barcode.");
       return;
     }
 
-    setSelectedProduct(product);
+    await openProductByBarcode(product.barcode);
+    setSearchText("");
+    setSuggestions([]);
   };
 
   const handleAddToBasket = (product: any) => {
@@ -172,7 +198,12 @@ export default function ScannerScreen() {
     setSuggestions([]);
   };
 
-const handleOpenLens = async () => {
+  const handleOpenLens = async () => {
+    if (isWeb) {
+      alert("Camera scan is not available in the browser. Open the app in Expo Go or a native build to use the camera.");
+      return;
+    }
+
     const response = await requestPermission();
     if (response?.granted) {
       setShowCamera(true);
@@ -190,6 +221,7 @@ const handleOpenLens = async () => {
         onClose={closeProduct}
         searchProducts={searchProducts}
         onAddToBasket={handleAddToBasket}
+        onSelectProduct={openProductByBarcode}
       />
     );
   }
@@ -227,12 +259,47 @@ const handleOpenLens = async () => {
               placeholderTextColor="#7b8794"
               value={searchText}
               onChangeText={handleSearch}
+              onSubmitEditing={() => handleSearch(searchText)}
               returnKeyType="search"
             />
           </View>
         </View>
 
-        <View style={[styles.featureCard, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
+        {(loading || suggestions.length > 0 || searchText.trim().length > 0) && (
+          <View style={[styles.suggestionsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
+            <View style={styles.suggestionsHeader}>
+              <Text style={[styles.suggestionsTitle, { color: palette.text }]}>Search Results</Text>
+              {loading ? (
+                <View style={styles.inlineLoading}>
+                  <ActivityIndicator size="small" color={palette.accentBright} />
+                  <Text style={[styles.loadingText, { color: palette.muted, marginLeft: 8 }]}>Searching...</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <ScrollView style={styles.suggestionList} nestedScrollEnabled>
+              {!loading && suggestions.length === 0 ? (
+                <Text style={[styles.noResultsText, { color: palette.muted }]}>No matching products found yet. Try another keyword.</Text>
+              ) : null}
+
+              {suggestions.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.suggestionItem} onPress={() => handleSelectSuggestion(item)}>
+                  {item.image ? <Image source={{ uri: item.image }} style={styles.suggestionImage} /> : <View style={styles.emptyImage} />}
+                  <View style={styles.suggestionTextWrap}>
+                    <Text style={[styles.suggestionName, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[styles.suggestionBrand, { color: palette.muted }]} numberOfLines={1}>{item.brand || item.barcode || "Open Food Facts"}</Text>
+                  </View>
+                  <View style={[styles.scoreBadge, { backgroundColor: item.nutriColor }]}> 
+                    <Text style={styles.scoreBadgeText}>{item.nutriScore}</Text>
+                  </View>
+                  <Text style={[styles.chevron, { color: palette.accentBright }]}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <View style={[styles.featureCard, { backgroundColor: palette.surface, borderColor: palette.border, marginTop: 12 }]}> 
           <View style={styles.featureHeader}>
             <View style={[styles.featureBadge, { backgroundColor: palette.surfaceSoft }]}> 
               <Text style={[styles.featureBadgeText, { color: palette.accentBright }]}>📸</Text>
@@ -242,24 +309,34 @@ const handleOpenLens = async () => {
               <Text style={[styles.featureSubtitle, { color: palette.muted }]}>Scan product barcodes through the camera for fast lookup.</Text>
             </View>
           </View>
-          {permission?.granted && showCamera ? (
+          {showCamera && !isWeb && hasCameraPermission ? (
             <View style={styles.cameraBox}>
               <CameraView
                 style={styles.camera}
                 onBarcodeScanned={scanEnabled ? handleBarcodeScanned : undefined}
-              >
-                <View style={styles.cameraShade}>
-                  <View style={styles.scanLine} />
-                </View>
-              </CameraView>
+                ratio="16:9"
+              />
+              <View style={styles.cameraShade}>
+                <View style={styles.scanLine} />
+              </View>
             </View>
           ) : (
             <View style={[styles.cameraPlaceholder, { backgroundColor: palette.surfaceSoft, borderColor: palette.border }]}> 
-              <Text style={[styles.placeholderText, { color: palette.muted }]}>Open the lens to scan barcodes directly with the camera.</Text>
+              <Text style={[styles.placeholderText, { color: palette.muted }]}>
+                Open the lens to scan barcodes directly with the camera.
+              </Text>
             </View>
           )}
-          <TouchableOpacity style={[styles.primaryButton, { backgroundColor: palette.accentBright }]} onPress={handleOpenLens}>
-            <Text style={styles.primaryButtonText}>Open Lens</Text>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              { backgroundColor: palette.accentBright },
+            ]}
+            onPress={handleOpenLens}
+          >
+            <Text style={styles.primaryButtonText}>
+              Open Lens
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -282,30 +359,7 @@ const handleOpenLens = async () => {
             <Text style={styles.secondaryButtonText}>Lookup Barcode</Text>
           </TouchableOpacity>
         </View>
-
-        {suggestions.length > 0 && (
-          <View style={[styles.suggestionsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
-            <Text style={[styles.suggestionsTitle, { color: palette.text }]}>Search Results</Text>
-            {suggestions.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.suggestionItem} onPress={() => handleSelectSuggestion(item)}>
-                {item.image ? <Image source={{ uri: item.image }} style={styles.suggestionImage} /> : <View style={styles.emptyImage} />}
-                <View style={styles.suggestionTextWrap}>
-                  <Text style={[styles.suggestionName, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
-                  <Text style={[styles.suggestionBrand, { color: palette.muted }]} numberOfLines={1}>{item.brand || item.barcode || "Open Food Facts"}</Text>
-                </View>
-                <Text style={[styles.chevron, { color: palette.accentBright }]}>›</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
       </ScrollView>
-
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#76FF03" />
-          <Text style={styles.loadingText}>Analyzing product...</Text>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -380,14 +434,27 @@ const styles = StyleSheet.create({
   barcodeDisplay: { alignItems: "center", borderRadius: 16, borderWidth: 1, marginVertical: 16, padding: 14 },
   secondaryButton: { alignItems: "center", borderRadius: 16, paddingVertical: 14, marginTop: 6 },
   secondaryButtonText: { color: "#fff", fontSize: 15, fontWeight: "900" },
-  suggestionsCard: { borderRadius: 20, borderWidth: 1, marginTop: 6, padding: 14 },
-  suggestionsTitle: { fontSize: 15, fontWeight: "900", marginBottom: 12 },
+  suggestionsCard: { borderRadius: 20, borderWidth: 1, marginTop: 6, marginBottom: 16, padding: 14, maxHeight: 320, overflow: "hidden" },
+  suggestionList: { maxHeight: 280 },
+  suggestionsHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
+  suggestionsTitle: { fontSize: 15, fontWeight: "900", marginBottom: 0 },
+  inlineLoading: { alignItems: "center", flexDirection: "row" },
+  noResultsText: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
   suggestionItem: { alignItems: "center", borderBottomColor: "#e5e7eb", borderBottomWidth: 1, flexDirection: "row", gap: 10, paddingVertical: 12 },
   suggestionImage: { backgroundColor: "#e5e7eb", borderRadius: 6, height: 44, width: 44 },
   emptyImage: { backgroundColor: "#e5e7eb", borderRadius: 6, height: 44, width: 44 },
   suggestionTextWrap: { flex: 1 },
   suggestionName: { color: "#111827", fontSize: 13, fontWeight: "700" },
   suggestionBrand: { color: "#64748b", fontSize: 11, marginTop: 2 },
+  scoreBadge: {
+    alignItems: "center",
+    borderRadius: 12,
+    height: 28,
+    justifyContent: "center",
+    minWidth: 38,
+    paddingHorizontal: 10,
+  },
+  scoreBadgeText: { color: "#ffffff", fontSize: 12, fontWeight: "800" },
   chevron: { color: "#16a34a", fontSize: 24 },
   sectionHeader: { fontSize: 18, fontWeight: "800", marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.5 },
   scanCard: {
@@ -414,8 +481,12 @@ const styles = StyleSheet.create({
   cameraShade: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.08)",
-    flex: 1,
+    height: "100%",
     justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
   },
   barcodeMock: { alignItems: "center", flex: 1, justifyContent: "center" },
   barcodeBars: {
@@ -534,20 +605,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   searchActionButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  suggestionItem: {
-    alignItems: "center",
-    borderBottomColor: "#e5e7eb",
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    paddingVertical: 10,
-  },
-  suggestionImage: { backgroundColor: "#e5e7eb", borderRadius: 6, height: 44, width: 44 },
-  emptyImage: { backgroundColor: "#e5e7eb", borderRadius: 6, height: 44, width: 44 },
-  suggestionTextWrap: { flex: 1 },
-  suggestionName: { color: "#111827", fontSize: 13, fontWeight: "700" },
-  suggestionBrand: { color: "#64748b", fontSize: 11, marginTop: 2 },
-  chevron: { color: "#16a34a", fontSize: 24 },
   splitRow: {
     flexDirection: "column",
     gap: 14,

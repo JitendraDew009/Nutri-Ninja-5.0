@@ -10,6 +10,7 @@ export interface RecommendationItem {
   score: number;
   image: string;
   brand?: string;
+  code?: string;
 }
 
 export interface Recommendations {
@@ -33,6 +34,7 @@ export function getRecommendations(currentProduct: any, products: any[]): Recomm
       brand: item.brands || "",
       score: getHealthScore(item),
       image: item.image_front_url || item.image_url || "",
+      code: item.code || item._id || "",
     }))
     // Remove duplicates and current product
     .filter((item) => !item.name.toLowerCase().includes(currentName))

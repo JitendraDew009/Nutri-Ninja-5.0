@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,10 +8,11 @@ import {
   Image,
   FlatList,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { getHealthScore, getNutriScore, getHealthScoreColor, getNutriScoreColor, getHealthScoreLabel, getPersonalizedInsights } from "../utils/healthScore";
 import { getWarnings, getNutritionInfo, getWarningColor } from "../utils/warnings";
-import { getRecommendations } from "../utils/recommendations";
+import { getRecommendations, RecommendationItem, Recommendations } from "../utils/recommendations";
 import { readStore, UserProfile } from "../utils/localStore";
 
 interface ProductDetailsProps {
@@ -19,12 +20,7 @@ interface ProductDetailsProps {
   onClose: () => void;
   searchProducts: (query: string) => Promise<any[]>;
   onAddToBasket?: (product: any) => void;
-}
-
-interface RecommendationItem {
-  name: string;
-  score: number;
-  image: string;
+  onSelectProduct?: (barcode: string) => Promise<void>;
 }
 
 export default function ProductDetailScreen({
@@ -32,12 +28,17 @@ export default function ProductDetailScreen({
   onClose,
   searchProducts,
   onAddToBasket,
+  onSelectProduct,
 }: ProductDetailsProps) {
-  const [recommendations, setRecommendations] = useState<any>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendations>({ better: [], worse: [] });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadRecommendations();
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ y: 0, animated: true });
+    }
   }, [product]);
 
   const loadRecommendations = async () => {
@@ -52,6 +53,17 @@ export default function ProductDetailScreen({
       setRecommendations({ better: [], worse: [] });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectRecommendation = async (item: RecommendationItem) => {
+    if (!item.code) {
+      alert("Unable to open product without a barcode.");
+      return;
+    }
+
+    if (onSelectProduct) {
+      await onSelectProduct(item.code);
     }
   };
 
@@ -86,34 +98,56 @@ export default function ProductDetailScreen({
 
   const scoreColor = getHealthScoreColor(healthScore);
   const nutriColor = getNutriScoreColor(nutriScore);
+  const { width } = useWindowDimensions();
+  const isWide = width >= 760;
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header with close button */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onClose}>
-          <Text style={styles.closeBtn}>✕ Close</Text>
-        </TouchableOpacity>
+    <ScrollView
+      ref={scrollRef}
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={[styles.imageWrapper, isWide && styles.imageWrapperWide]}>
+        {productImageUri ? (
+          <Image source={{ uri: productImageUri }} style={styles.productImage} />
+        ) : (
+          <View style={styles.productImagePlaceholder}>
+            <Text style={styles.placeholderText}>No image available</Text>
+          </View>
+        )}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Text style={styles.closeBtn}>✕ Close</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.imageOverlay}>
+          <Text style={styles.productNameOverlay} numberOfLines={2}>{product.product_name}</Text>
+          {product.brands ? <Text style={styles.brandOverlay}>{product.brands}</Text> : null}
+        </View>
       </View>
 
-      {/* Product Image */}
-      {productImageUri ? (
-        <Image source={{ uri: productImageUri }} style={styles.productImage} />
-      ) : (
-        <View style={styles.productImagePlaceholder}>
-          <Text style={styles.placeholderText}>No image available</Text>
-        </View>
-      )}
-
-      {/* Product Info */}
-      <View style={styles.productInfo}>
-        <Text style={styles.productName}>{product.product_name}</Text>
-        {product.brands && <Text style={styles.brand}>{product.brands}</Text>}
-        {onAddToBasket && (
+      <View style={[styles.detailContainer, isWide && styles.detailContainerWide]}>
+        {onAddToBasket ? (
           <TouchableOpacity style={styles.basketButton} onPress={() => onAddToBasket(product)}>
             <Text style={styles.basketButtonText}>Add to Grocery Basket</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
+
+        <View style={[styles.scoreCard, isWide ? styles.scoreCardHorizontal : styles.scoreCardVertical]}>
+          <View style={[styles.scoreCircle, { backgroundColor: scoreColor }]}> 
+            <Text style={styles.scoreNumber}>{healthScore}</Text>
+            <Text style={styles.scoreMax}>/100</Text>
+          </View>
+          <View style={styles.scoreInfo}>
+            <Text style={styles.scoreLabel}>Health Score</Text>
+            <Text style={[styles.scoreStatus, { color: scoreColor }]}>{getHealthScoreLabel(healthScore)}</Text>
+          </View>
+          <View style={[styles.nutriCard, { borderLeftColor: nutriColor }]}> 
+            <Text style={styles.nutriLabel}>Nutri-Score</Text>
+            <Text style={[styles.nutriGrade, { color: nutriColor }]}>{nutriScore}</Text>
+          </View>
+        </View>
       </View>
 
       {ingredientText ? (
@@ -183,59 +217,71 @@ export default function ProductDetailScreen({
         </View>
       )}
 
-      {/* Better Alternatives */}
-      {recommendations && recommendations.better.length > 0 && (
-        <View style={styles.recommendationSection}>
-          <Text style={styles.sectionTitle}>💚 Healthier Alternatives</Text>
-          <FlatList
-            data={recommendations.better}
-            keyExtractor={(item, index) => index.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            scrollEnabled={false}
-            renderItem={({ item }: { item: RecommendationItem }) => (
-              <View style={styles.recommendationCard}>
-                {item.image && (
-                  <Image source={{ uri: item.image }} style={styles.recommendationImage} />
-                )}
-                <View style={styles.recommendationBadge}>
-                  <Text style={styles.recommendationScore}>{item.score}</Text>
-                </View>
-                <Text style={styles.recommendationName} numberOfLines={2}>
-                  {item.name}
-                </Text>
-              </View>
-            )}
-          />
-        </View>
-      )}
+      <View style={styles.recommendationSection}>
+        <Text style={styles.sectionTitle}>🔍 Recommendations</Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#76FF03" />
+            <Text style={styles.loadingText}>Loading recommendations...</Text>
+          </View>
+        ) : recommendations.better.length === 0 && recommendations.worse.length === 0 ? (
+          <Text style={styles.noRecommendationsText}>No alternative recommendations were found for this product.</Text>
+        ) : null}
 
-      {/* Worse Alternatives */}
-      {recommendations && recommendations.worse.length > 0 && (
-        <View style={styles.recommendationSection}>
-          <Text style={styles.sectionTitle}>⚠️ Less Healthy Alternatives</Text>
-          <FlatList
-            data={recommendations.worse}
-            keyExtractor={(item, index) => index.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            scrollEnabled={false}
-            renderItem={({ item }: { item: RecommendationItem }) => (
-              <View style={styles.recommendationCard}>
-                {item.image && (
-                  <Image source={{ uri: item.image }} style={styles.recommendationImage} />
-                )}
-                <View style={styles.recommendationBadge}>
-                  <Text style={styles.recommendationScore}>{item.score}</Text>
-                </View>
-                <Text style={styles.recommendationName} numberOfLines={2}>
-                  {item.name}
-                </Text>
-              </View>
-            )}
-          />
-        </View>
-      )}
+        {recommendations.better.length > 0 && (
+          <View style={styles.recommendationBlock}>
+            <Text style={styles.recommendationTitle}>Healthier Alternatives</Text>
+            <FlatList
+              data={recommendations.better}
+              keyExtractor={(item, index) => `${item.name}-${index}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendationList}
+              renderItem={({ item }: { item: RecommendationItem }) => (
+                <TouchableOpacity style={styles.recommendationCard} activeOpacity={0.85} onPress={() => handleSelectRecommendation(item)}>
+                  {item.image ? (
+                    <Image source={{ uri: item.image }} style={styles.recommendationImage} />
+                  ) : null}
+                  <View style={styles.recommendationBadge}>
+                    <Text style={styles.recommendationScore}>{item.score}</Text>
+                  </View>
+                  <Text style={styles.recommendationName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  {item.brand ? <Text style={styles.recommendationBrand}>{item.brand}</Text> : null}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
+
+        {recommendations.worse.length > 0 && (
+          <View style={styles.recommendationBlock}>
+            <Text style={styles.recommendationTitle}>Less Healthy Alternatives</Text>
+            <FlatList
+              data={recommendations.worse}
+              keyExtractor={(item, index) => `${item.name}-${index}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendationList}
+              renderItem={({ item }: { item: RecommendationItem }) => (
+                <TouchableOpacity style={styles.recommendationCard} activeOpacity={0.85} onPress={() => handleSelectRecommendation(item)}>
+                  {item.image ? (
+                    <Image source={{ uri: item.image }} style={styles.recommendationImage} />
+                  ) : null}
+                  <View style={[styles.recommendationBadge, styles.recommendationBadgeWarning]}>
+                    <Text style={styles.recommendationScore}>{item.score}</Text>
+                  </View>
+                  <Text style={styles.recommendationName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  {item.brand ? <Text style={styles.recommendationBrand}>{item.brand}</Text> : null}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
+      </View>
 
       {/* Loading indicator */}
       {loading && (
@@ -256,36 +302,80 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0F1419",
   },
-  header: {
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "flex-end",
+  content: {
+    paddingBottom: 24,
   },
-  closeBtn: {
-    color: "#76FF03",
-    fontSize: 16,
-    fontWeight: "600",
+  imageWrapper: {
+    position: "relative",
+    width: "100%",
+    minHeight: 240,
+    backgroundColor: "#1a1f26",
+  },
+  imageWrapperWide: {
+    minHeight: 340,
   },
   productImage: {
     width: "100%",
-    height: 300,
-    backgroundColor: "#1a1f26",
+    height: "100%",
+    resizeMode: "cover",
   },
   productImagePlaceholder: {
     width: "100%",
-    height: 300,
+    height: 260,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#1a1f26",
   },
   placeholderText: {
-    color: "#999",
+    color: "#fff",
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  header: {
+    position: "absolute",
+    top: 18,
+    right: 18,
+    zIndex: 10,
+  },
+  closeButton: {
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 18,
+    padding: 10,
+  },
+  closeBtn: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  imageOverlay: {
+    position: "absolute",
+    left: 20,
+    bottom: 20,
+    right: 20,
+    padding: 16,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    borderRadius: 16,
+  },
+  productNameOverlay: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  brandOverlay: {
+    color: "#d7e9ff",
     fontSize: 14,
   },
+  detailContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  detailContainerWide: {
+    paddingHorizontal: 28,
+  },
   productInfo: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1a1f26",
+    marginTop: 12,
   },
   productName: {
     fontSize: 20,
@@ -299,22 +389,35 @@ const styles = StyleSheet.create({
   },
   basketButton: {
     backgroundColor: "#76FF03",
-    borderRadius: 8,
+    borderRadius: 999,
     marginTop: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     alignItems: "center",
+    alignSelf: "flex-start",
+    shadowColor: "#76FF03",
+    shadowOpacity: 0.24,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
   },
   basketButtonText: {
     color: "#000",
     fontSize: 14,
-    fontWeight: "bold",
+    fontWeight: "900",
   },
   scoreCard: {
-    flexDirection: "row",
-    padding: 16,
+    padding: 18,
+    borderRadius: 18,
+    backgroundColor: "#121a22",
+    marginBottom: 16,
     gap: 16,
     alignItems: "center",
+  },
+  scoreCardHorizontal: {
+    flexDirection: "row",
+  },
+  scoreCardVertical: {
+    flexDirection: "column",
   },
   scoreCircle: {
     width: 80,
@@ -356,8 +459,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   nutriGrade: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 24,
+    fontWeight: "900",
   },
   warningsSection: {
     padding: 16,
@@ -374,15 +477,15 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     paddingLeft: 12,
     marginBottom: 12,
-    backgroundColor: "#1a1f26",
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: "#121a22",
+    padding: 14,
+    borderRadius: 12,
   },
   warningTitle: {
     fontSize: 14,
     fontWeight: "bold",
     color: "#fff",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   warningMessage: {
     fontSize: 12,
@@ -391,8 +494,9 @@ const styles = StyleSheet.create({
   },
   insightsSection: {
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1a1f26",
+    borderRadius: 18,
+    backgroundColor: "#121a22",
+    marginBottom: 16,
   },
   insightItem: {
     backgroundColor: "#172033",
@@ -419,9 +523,10 @@ const styles = StyleSheet.create({
   },
   nutritionItem: {
     width: "48%",
-    backgroundColor: "#1a1f26",
+    backgroundColor: "#121a22",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
+    minWidth: 140,
   },
   nutritionLabel: {
     fontSize: 12,
@@ -447,41 +552,71 @@ const styles = StyleSheet.create({
   },
   recommendationSection: {
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1a1f26",
+    backgroundColor: "#121a22",
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  recommendationBlock: {
+    marginTop: 12,
+  },
+  recommendationTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 12,
+  },
+  recommendationList: {
+    paddingLeft: 2,
   },
   recommendationCard: {
     marginRight: 12,
-    alignItems: "center",
-    width: 120,
+    width: 140,
+    borderRadius: 18,
+    backgroundColor: "#0f1720",
+    padding: 12,
+    minHeight: 220,
   },
   recommendationImage: {
-    width: 120,
-    height: 140,
-    borderRadius: 8,
+    width: "100%",
+    height: 120,
+    borderRadius: 14,
     backgroundColor: "#1a1f26",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   recommendationBadge: {
     position: "absolute",
-    top: 8,
-    right: 8,
+    top: 12,
+    right: 12,
     backgroundColor: "#76FF03",
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
   },
+  recommendationBadgeWarning: {
+    backgroundColor: "#f97316",
+  },
   recommendationScore: {
     fontSize: 14,
-    fontWeight: "bold",
+    fontWeight: "900",
     color: "#000",
   },
   recommendationName: {
+    fontSize: 14,
+    color: "#fff",
+    textAlign: "left",
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  recommendationBrand: {
     fontSize: 12,
-    color: "#ccc",
-    textAlign: "center",
+    color: "#a3b3c1",
+  },
+  noRecommendationsText: {
+    color: "#a3b3c1",
+    fontSize: 13,
+    lineHeight: 18,
   },
   loadingContainer: {
     padding: 20,

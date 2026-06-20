@@ -43,21 +43,17 @@ export async function analyzeProduct(product: any, profile?: any) {
 export async function searchProducts(
   category: string
 ) {
-  if (!category) {
+  const query = category?.trim();
+  if (!query) {
     return [];
   }
 
-  const firstCategory =
-    category
-      .split(",")[0]
-      .trim();
-
   const backendUrl =
-    `${BACKEND_URL}/search?query=${encodeURIComponent(firstCategory)}&page_size=40`;
+    `${BACKEND_URL}/search?query=${encodeURIComponent(query)}&page_size=40`;
 
   const fallbackUrl =
     `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
-      firstCategory
+      query
     )}&search_simple=1&json=1&page_size=40`;
 
   try {
