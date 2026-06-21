@@ -7,28 +7,28 @@ export type ThemeMode = "day" | "dark";
 
 export const palettes = {
   day: {
-    background: "#f6faf4",
+    background: "#f4f7fb",
     surface: "#ffffff",
-    surfaceSoft: "#f8fafc",
-    text: "#111827",
-    muted: "#64748b",
-    border: "#e2e8f0",
-    header: "#0b1726",
-    accent: "#35a853",
-    accentBright: "#76FF03",
-    danger: "#dc2626",
+    surfaceSoft: "#edf2f8",
+    text: "#10172f",
+    muted: "#64718a",
+    border: "#d9e1ec",
+    header: "#10172f",
+    accent: "#22b86f",
+    accentBright: "#49df88",
+    danger: "#ef4650",
   },
   dark: {
-    background: "#0F1419",
-    surface: "#1a1f26",
-    surfaceSoft: "#111827",
-    text: "#ffffff",
-    muted: "#9aa6b2",
-    border: "#263241",
-    header: "#07111f",
-    accent: "#76FF03",
-    accentBright: "#76FF03",
-    danger: "#ef4444",
+    background: "#050817",
+    surface: "#10172f",
+    surfaceSoft: "#202b52",
+    text: "#f8fafc",
+    muted: "#9ca7be",
+    border: "#2c395f",
+    header: "#102f38",
+    accent: "#22b86f",
+    accentBright: "#49df88",
+    danger: "#ef4650",
   },
 };
 
@@ -42,11 +42,12 @@ type ThemeModeContextValue = {
 const ThemeModeContext = createContext<ThemeModeContextValue | null>(null);
 
 export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>(() => readStore("themeMode", "day"));
+  const [mode, setModeState] = useState<ThemeMode>(() => readStore("themeModeV2", "dark"));
 
   const setMode = (nextMode: ThemeMode) => {
     setModeState(nextMode);
     writeStore("themeMode", nextMode);
+    writeStore("themeModeV2", nextMode);
   };
 
   const value = useMemo(

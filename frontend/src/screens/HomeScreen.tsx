@@ -1,4 +1,5 @@
 import React from "react";
+import { SymbolView } from "expo-symbols";
 import {
   View,
   Text,
@@ -20,7 +21,7 @@ export default function HomeScreen({ onNavigate }: HomeScreenProps) {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerIcon}>🥷</Text>
+        <SymbolView name={{ ios: "leaf.fill", android: "eco", web: "eco" }} tintColor="#76FF03" size={44} />
         <Text style={styles.headerTitle}>Nutri Ninja</Text>
         <Text style={styles.headerSubtitle}>Smart Food Analysis</Text>
       </View>
@@ -37,7 +38,7 @@ export default function HomeScreen({ onNavigate }: HomeScreenProps) {
 
       {/* Main CTA Button */}
       <TouchableOpacity style={styles.ctaButton} onPress={() => onNavigate?.("scanner")}>
-        <Text style={styles.ctaIcon}>📷</Text>
+        <SymbolView name={{ ios: "barcode.viewfinder", android: "barcode_scanner", web: "barcode_scanner" }} tintColor="#000" size={24} />
         <Text style={styles.ctaText}>Scan Barcode Now</Text>
       </TouchableOpacity>
 
@@ -50,37 +51,37 @@ export default function HomeScreen({ onNavigate }: HomeScreenProps) {
         <Text style={styles.sectionTitle}>Key Features</Text>
 
         <FeatureCard
-          icon="📊"
+          icon="monitoring"
           title="Health Score"
           description="Get AI-calculated 1-100 healthiness rating"
         />
 
         <FeatureCard
-          icon="🏷️"
+          icon="nutrition"
           title="Nutri-Score"
           description="Visual A-E grade for quick reference"
         />
 
         <FeatureCard
-          icon="⚠️"
+          icon="warning"
           title="Smart Warnings"
           description="Alerts for high sugar, salt, and fat content"
         />
 
         <FeatureCard
-          icon="💚"
+          icon="recommend"
           title="Better Alternatives"
           description="Find healthier similar products instantly"
         />
 
         <FeatureCard
-          icon="🚫"
+          icon="block"
           title="Avoid Unhealthy"
           description="See worst similar foods to stay aware"
         />
 
         <FeatureCard
-          icon="🧬"
+          icon="biotech"
           title="Full Nutrition Data"
           description="Complete breakdown of all nutrients"
         />
@@ -108,11 +109,11 @@ export default function HomeScreen({ onNavigate }: HomeScreenProps) {
       <View style={styles.benefitsSection}>
         <Text style={styles.sectionTitle}>Why Nutri Ninja?</Text>
 
-        <BenefitItem emoji="⚡" text="Instant analysis - results in seconds" />
-        <BenefitItem emoji="🎯" text="Personalized health insights" />
-        <BenefitItem emoji="📱" text="Works offline - no internet needed" />
-        <BenefitItem emoji="🌍" text="Supports 100,000+ products" />
-        <BenefitItem emoji="🔐" text="Your data stays private" />
+        <BenefitItem icon="bolt" text="Instant analysis - results in seconds" />
+        <BenefitItem icon="target" text="Personalized health insights" />
+        <BenefitItem icon="smartphone" text="Works offline - no internet needed" />
+        <BenefitItem icon="public" text="Supports 100,000+ products" />
+        <BenefitItem icon="lock" text="Your data stays private" />
       </View>
 
       {/* Footer CTA */}
@@ -130,7 +131,7 @@ export default function HomeScreen({ onNavigate }: HomeScreenProps) {
 }
 
 interface FeatureCardProps {
-  icon: string;
+  icon: any;
   title: string;
   description: string;
 }
@@ -138,7 +139,7 @@ interface FeatureCardProps {
 function FeatureCard({ icon, title, description }: FeatureCardProps) {
   return (
     <View style={styles.featureCard}>
-      <Text style={styles.featureIcon}>{icon}</Text>
+      <SymbolView name={{ ios: "circle.grid.2x2.fill", android: icon, web: icon }} tintColor="#76FF03" size={28} />
       <View style={styles.featureContent}>
         <Text style={styles.featureTitle}>{title}</Text>
         <Text style={styles.featureDescription}>{description}</Text>
@@ -169,14 +170,14 @@ function StepCard({ step, title, description }: StepCardProps) {
 }
 
 interface BenefitItemProps {
-  emoji: string;
+  icon: any;
   text: string;
 }
 
-function BenefitItem({ emoji, text }: BenefitItemProps) {
+function BenefitItem({ icon, text }: BenefitItemProps) {
   return (
     <View style={styles.benefitItem}>
-      <Text style={styles.benefitEmoji}>{emoji}</Text>
+      <SymbolView name={{ ios: "checkmark.circle.fill", android: icon, web: icon }} tintColor="#76FF03" size={24} />
       <Text style={styles.benefitText}>{text}</Text>
     </View>
   );

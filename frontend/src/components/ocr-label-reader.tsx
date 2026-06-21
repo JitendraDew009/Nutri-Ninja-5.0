@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { SymbolView } from 'expo-symbols';
 import {
   View,
   Text,
@@ -126,7 +127,10 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
       <ScrollView contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: palette.text }]}>🔍 OCR Label Reader</Text>
+          <View style={styles.titleRow}>
+            <SymbolView name={{ ios: 'doc.text.viewfinder', android: 'document_scanner', web: 'document_scanner' }} tintColor={palette.accentBright} size={26} />
+            <Text style={[styles.title, { color: palette.text }]}>Label Reader</Text>
+          </View>
           <Text style={[styles.subtitle, { color: palette.muted }]}>
             Extract ingredients from food package labels
           </Text>
@@ -145,7 +149,10 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
               {ocrLoading ? (
                 <ActivityIndicator color={palette.background} />
               ) : (
-                <Text style={styles.buttonText}>📷 Take Photo</Text>
+                <View style={styles.buttonContent}>
+                  <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} tintColor="#071007" size={20} />
+                  <Text style={styles.buttonText}>Take photo</Text>
+                </View>
               )}
             </TouchableOpacity>
 
@@ -154,7 +161,10 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
               onPress={() => fileInputRef.current?.click()}
               disabled={ocrLoading}
             >
-              <Text style={styles.buttonText}>📤 Upload Image</Text>
+              <View style={styles.buttonContent}>
+                <SymbolView name={{ ios: 'square.and.arrow.up', android: 'upload', web: 'upload' }} tintColor="#071007" size={20} />
+                <Text style={styles.buttonText}>Upload image</Text>
+              </View>
             </TouchableOpacity>
 
             <input
@@ -189,7 +199,10 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
               {loading ? (
                 <ActivityIndicator color={palette.background} />
               ) : (
-                <Text style={styles.buttonText}>✨ Analyze Ingredients</Text>
+                <View style={styles.buttonContent}>
+                  <SymbolView name={{ ios: 'checkmark.circle', android: 'fact_check', web: 'fact_check' }} tintColor="#071007" size={20} />
+                  <Text style={styles.buttonText}>Analyze ingredients</Text>
+                </View>
               )}
             </TouchableOpacity>
           </View>
@@ -201,7 +214,7 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
             <View style={styles.resultHeader}>
               <Text style={[styles.resultTitle, { color: palette.text }]}>Analysis Results</Text>
               <TouchableOpacity onPress={() => setHealthAssessment(null)}>
-                <Text style={[styles.resetText, { color: palette.accentBright }]}>← New Analysis</Text>
+                <Text style={[styles.resetText, { color: palette.accentBright }]}>New analysis</Text>
               </TouchableOpacity>
             </View>
 
@@ -218,7 +231,7 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
                 <Text style={[styles.detailsTitle, { color: palette.text }]}>Notes:</Text>
                 {healthAssessment.details.map((detail: string, index: number) => (
                   <Text key={index} style={[styles.detailItem, { color: palette.muted }]}>
-                    • {detail}
+                    {detail}
                   </Text>
                 ))}
               </View>
@@ -227,7 +240,10 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
             {/* Allergens */}
             {allergens.length > 0 && (
               <View style={[styles.allergenBox, { backgroundColor: 'rgba(220,53,69,0.1)', borderColor: '#dc3545' }]}>
-                <Text style={[styles.allergenTitle, { color: '#dc3545' }]}>⚠️ Allergens Detected</Text>
+                <View style={styles.buttonContent}>
+                  <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} tintColor="#dc3545" size={20} />
+                  <Text style={[styles.allergenTitle, { color: '#dc3545' }]}>Allergens detected</Text>
+                </View>
                 {allergens.map((allergen, index) => (
                   <View key={index} style={styles.allergenItem}>
                     <Text style={[styles.allergenName, { color: '#dc3545' }]}>{allergen.name}</Text>
@@ -257,7 +273,6 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
                     ]}
                   >
                     <Text style={[styles.ingredientName, { color: palette.text }]}>
-                      {ingredient.isAllergen ? '⚠️ ' : ''}
                       {ingredient.name}
                     </Text>
                     {ingredient.quantity && (
@@ -289,6 +304,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 30 },
   header: { marginBottom: 20 },
+  titleRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   title: { fontSize: 22, fontWeight: '900', marginBottom: 8 },
   subtitle: { fontSize: 14 },
   card: {
@@ -306,6 +322,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  buttonContent: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' },
   divider: { height: 1, borderWidth: 1, marginVertical: 16 },
   textInput: {
     borderRadius: 8,

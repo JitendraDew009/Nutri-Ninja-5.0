@@ -161,6 +161,19 @@ export function getPersonalizedInsights(product: any, profile?: any): string[] {
       });
   }
 
+  const avoided = String(profile?.dislikedIngredients || "").toLowerCase();
+  if (avoided && ingredients) {
+    avoided
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .forEach((ingredient) => {
+        if (ingredients.includes(ingredient)) {
+          insights.push(`Preference alert: this product contains ${ingredient}, which is on your avoid list.`);
+        }
+      });
+  }
+
   if (insights.length === 0) {
     insights.push("No major profile-specific issues detected from available label data.");
   }

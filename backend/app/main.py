@@ -1,9 +1,30 @@
-from typing import Any
+import os
+import re
+import time
+import base64
+from typing import Any, Literal
 
-import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Use the Windows certificate store when the local Python CA bundle cannot
+# validate HTTPS traffic (common with managed antivirus/proxy certificates).
+try:
+    import truststore
+except ImportError:
+    try:
+        import pip._vendor.truststore as truststore
+    except ImportError:
+        truststore = None
+
+if truststore is not None:
+    truststore.inject_into_ssl()
+
+import requests
+
+load_dotenv()
 
 app = FastAPI(title="Nutri Ninja API", version="5.0")
 
@@ -36,6 +57,21 @@ class LabelPayload(BaseModel):
     allergies: str = ""
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatPayload(BaseModel):
+    messages: list[ChatMessage]
+    profile: dict[str, Any] | None = None
+
+
+class VoiceChatPayload(ChatPayload):
+    audio_base64: str
+    mime_type: str = "audio/webm"
+
+
 SUGAR_TERMS = ["sugar", "glucose", "fructose", "dextrose", "maltose", "sucrose", "jaggery", "corn syrup"]
 SALT_TERMS = ["salt", "sodium", "baking soda", "sodium chloride"]
 ADDITIVE_TERMS = [
@@ -50,6 +86,8 @@ ADDITIVE_TERMS = [
     "aspartame",
 ]
 GOOD_TERMS = ["whole wheat", "oats", "millet", "ragi", "jowar", "bran", "fiber", "fibre", "protein", "lentil"]
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
 
 def health_score(product: dict[str, Any]) -> int:
@@ -214,6 +252,108 @@ def label_analysis(text: str, allergies: str = "") -> dict[str, Any]:
     return {"score": max(1, min(100, score)), "findings": findings}
 
 
+def response_text(data: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for candidate in data.get("candidates") or []:
+        for part in (candidate.get("content") or {}).get("parts") or []:
+            text = part.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def retry_delay_seconds(data: dict[str, Any]) -> float | None:
+    for detail in (data.get("error") or {}).get("details") or []:
+        if detail.get("@type", "").endswith("RetryInfo"):
+            delay = str(detail.get("retryDelay") or "")
+            match = re.match(r"([\d.]+)s", delay)
+            if match:
+                return float(match.group(1))
+
+    message = str((data.get("error") or {}).get("message") or "")
+    match = re.search(r"retry in ([\d.]+)s", message, re.IGNORECASE)
+    return float(match.group(1)) if match else None
+
+
+def generate_gemini(contents: list[dict[str, Any]], profile: dict[str, Any] | None) -> str:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Chat is not configured. Add GEMINI_API_KEY to backend/.env and restart the backend.",
+        )
+
+    profile = profile or {}
+    profile_context = (
+        f"Name: {profile.get('name', 'User')}; "
+        f"relationship: {profile.get('relationship', 'self')}; "
+        f"goal: {profile.get('goal', 'general')}; "
+        f"dietary preferences: {', '.join(profile.get('restrictions') or []) or 'none'}; "
+        f"allergies: {profile.get('allergies', 'none') or 'none'}; "
+        f"conditions: {profile.get('conditions', 'none') or 'none'}; "
+        f"ingredients to avoid: {profile.get('dislikedIngredients', 'none') or 'none'}."
+    )
+    request_body = {
+        "system_instruction": {
+            "parts": [{
+                "text": (
+                    "You are Nutri Ninja, a concise and friendly nutrition assistant. "
+                    "Give practical food, ingredient, grocery, and label guidance. "
+                    "Respect the user's allergies and dietary goals. Do not diagnose or "
+                    "replace a clinician. For urgent symptoms, advise professional care. "
+                    "When audio is provided, understand it as the user's spoken question. "
+                    "Keep spoken-friendly answers under 140 words unless detail is requested. "
+                    f"Current user profile: {profile_context}"
+                )
+            }]
+        },
+        "contents": contents,
+        "generationConfig": {"maxOutputTokens": 350},
+    }
+
+    try:
+        response = None
+        for attempt in range(2):
+            response = requests.post(
+                f"{GEMINI_API_BASE}/{GEMINI_MODEL}:generateContent",
+                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                json=request_body,
+                timeout=60,
+            )
+            if response.status_code != 429:
+                break
+
+            error_data = response.json()
+            delay = retry_delay_seconds(error_data)
+            if attempt == 0 and delay is not None and delay <= 12:
+                time.sleep(delay + 0.5)
+                continue
+
+            wait_seconds = max(1, round(delay or 60))
+            raise HTTPException(
+                status_code=429,
+                detail=f"Gemini's free tier is temporarily busy. Please try again in about {wait_seconds} seconds.",
+            )
+
+        assert response is not None
+        response.raise_for_status()
+        answer = response_text(response.json())
+    except HTTPException:
+        raise
+    except requests.RequestException as exc:
+        detail = "The AI service could not be reached."
+        if exc.response is not None:
+            try:
+                detail = exc.response.json().get("error", {}).get("message") or detail
+            except ValueError:
+                pass
+        raise HTTPException(status_code=502, detail=detail) from exc
+
+    if not answer:
+        raise HTTPException(status_code=502, detail="The AI service returned an empty response.")
+    return answer
+
+
 @app.get("/")
 def home():
     return {
@@ -271,6 +411,61 @@ def recommendations(payload: RecommendationPayload):
 @app.post("/label/analyze")
 def analyze_label(payload: LabelPayload):
     return label_analysis(payload.text, payload.allergies)
+
+
+@app.post("/chat")
+def chat(payload: ChatPayload):
+    messages = payload.messages[-12:]
+    if not messages or not messages[-1].content.strip():
+        raise HTTPException(status_code=400, detail="A message is required.")
+
+    contents = [
+        {
+            "role": "model" if message.role == "assistant" else "user",
+            "parts": [{"text": message.content.strip()}],
+        }
+        for message in messages
+        if message.content.strip()
+    ]
+
+    answer = generate_gemini(contents, payload.profile)
+    return {"message": answer, "model": GEMINI_MODEL}
+
+
+@app.post("/chat/voice")
+def voice_chat(payload: VoiceChatPayload):
+    try:
+        audio_bytes = base64.b64decode(payload.audio_base64, validate=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="The recorded audio is invalid.") from exc
+
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="No audio was recorded.")
+    if len(audio_bytes) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Voice recording is too long. Keep it under one minute.")
+
+    history = [
+        {
+            "role": "model" if message.role == "assistant" else "user",
+            "parts": [{"text": message.content.strip()}],
+        }
+        for message in payload.messages[-8:]
+        if message.content.strip()
+    ]
+    history.append({
+        "role": "user",
+        "parts": [
+            {"text": "Listen to this voice message and answer the spoken question."},
+            {
+                "inline_data": {
+                    "mime_type": payload.mime_type,
+                    "data": payload.audio_base64,
+                }
+            },
+        ],
+    })
+    answer = generate_gemini(history, payload.profile)
+    return {"message": answer, "model": GEMINI_MODEL}
 
 
 @app.post("/user/profile/{user_id}")

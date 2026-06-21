@@ -11,13 +11,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { SymbolView } from "expo-symbols";
 
 import ProductDetailScreen from "./ProductDetailScreen";
 import OCRLabelReader from "../components/ocr-label-reader";
 import ProductImage from "../components/product-image";
 import { fetchProduct, searchProducts } from "../services/api";
 import { getHealthScore, getHealthScoreColor, getNutriScore, getNutriScoreColor } from "../utils/healthScore";
-import { productSummary, readStore, writeStore, UserProfile } from "../utils/localStore";
+import { getActiveProfile, productSummary, profileStoreKey, readStore, writeStore, UserProfile } from "../utils/localStore";
 import { useThemeMode } from "../utils/themeMode";
 import { getProductImageUrl, getProductImageUrls } from "../utils/productImage";
 
@@ -31,16 +32,6 @@ interface Suggestion {
   nutriScore: string;
   nutriColor: string;
 }
-
-const defaultProfile: UserProfile = {
-  name: "Nutri Ninja User",
-  age: "",
-  weight: "",
-  goal: "general",
-  restrictions: [],
-  allergies: "",
-  conditions: "",
-};
 
 const goalLabels: Record<UserProfile["goal"], string> = {
   general: "General Fitness",
@@ -57,9 +48,9 @@ export default function ScannerScreen() {
   const [searchText, setSearchText] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-  const [scanHistory, setScanHistory] = useState<any[]>(() => readStore("scanHistory", []));
-  const [basket, setBasket] = useState<any[]>(() => readStore("groceryBasket", []));
-  const [profile, setProfile] = useState<UserProfile>(() => readStore("userProfile", defaultProfile));
+  const [scanHistory, setScanHistory] = useState<any[]>(() => readStore(profileStoreKey("scanHistory"), []));
+  const [basket, setBasket] = useState<any[]>(() => readStore(profileStoreKey("groceryBasket"), []));
+  const [profile, setProfile] = useState<UserProfile>(getActiveProfile);
   const [loading, setLoading] = useState(false);
   const [scanEnabled, setScanEnabled] = useState(true);
   const [showCamera, setShowCamera] = useState(false);
@@ -87,7 +78,7 @@ export default function ScannerScreen() {
       ...scanHistory.filter((item) => item.code !== summary.code),
     ].slice(0, 30);
     setScanHistory(nextHistory);
-    writeStore("scanHistory", nextHistory);
+    writeStore(profileStoreKey("scanHistory", profile.id), nextHistory);
     return summary;
   };
 
@@ -187,12 +178,22 @@ export default function ScannerScreen() {
       ...basket.filter((item) => item.code !== summary.code),
     ].slice(0, 30);
     setBasket(nextBasket);
-    writeStore("groceryBasket", nextBasket);
+    writeStore(profileStoreKey("groceryBasket", profile.id), nextBasket);
     alert("Added to grocery basket");
   };
 
   useEffect(() => {
-    setProfile(readStore("userProfile", defaultProfile));
+    const refreshProfile = () => {
+      const nextProfile = getActiveProfile();
+      setProfile(nextProfile);
+      setScanHistory(readStore(profileStoreKey("scanHistory", nextProfile.id), []));
+      setBasket(readStore(profileStoreKey("groceryBasket", nextProfile.id), []));
+    };
+    refreshProfile();
+    if (typeof window !== "undefined") {
+      window.addEventListener("nutri-profile-changed", refreshProfile);
+      return () => window.removeEventListener("nutri-profile-changed", refreshProfile);
+    }
   }, []);
 
   const closeProduct = () => {
@@ -236,7 +237,7 @@ export default function ScannerScreen() {
         <View style={[styles.profileHeader, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
           <View style={styles.profileBrand}> 
             <View style={[styles.logoCircle, { backgroundColor: palette.surfaceSoft }]}> 
-              <Text style={[styles.logoEmoji, { color: palette.accentBright }]}>🥑</Text>
+              <SymbolView name={{ ios: "person.fill", android: "person", web: "person" }} tintColor={palette.accentBright} size={24} />
             </View>
             <View>
               <Text style={[styles.profileName, { color: palette.text }]}>Hello, {profile.name}</Text>
@@ -256,7 +257,7 @@ export default function ScannerScreen() {
 
         <View style={[styles.searchBarCard, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
           <View style={[styles.searchBar, { backgroundColor: palette.surfaceSoft, borderColor: palette.border }]}> 
-            <Text style={[styles.searchIcon, { color: palette.muted }]}>🔎</Text>
+            <SymbolView name={{ ios: "magnifyingglass", android: "search", web: "search" }} tintColor={palette.muted} size={20} />
             <TextInput
               style={[styles.searchInput, { color: palette.text }]}
               placeholder="Search by product or brand"
@@ -300,7 +301,7 @@ export default function ScannerScreen() {
                   <View style={[styles.scoreBadge, { backgroundColor: item.nutriColor }]}> 
                     <Text style={styles.scoreBadgeText}>{item.nutriScore}</Text>
                   </View>
-                  <Text style={[styles.chevron, { color: palette.accentBright }]}>›</Text>
+                  <SymbolView name={{ ios: "chevron.right", android: "chevron_right", web: "chevron_right" }} tintColor={palette.accentBright} size={22} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -310,7 +311,7 @@ export default function ScannerScreen() {
         <View style={[styles.featureCard, { backgroundColor: palette.surface, borderColor: palette.border, marginTop: 12 }]}> 
           <View style={styles.featureHeader}>
             <View style={[styles.featureBadge, { backgroundColor: palette.surfaceSoft }]}> 
-              <Text style={[styles.featureBadgeText, { color: palette.accentBright }]}>📸</Text>
+              <SymbolView name={{ ios: "barcode.viewfinder", android: "barcode_scanner", web: "barcode_scanner" }} tintColor={palette.accentBright} size={24} />
             </View>
             <View style={styles.featureTextBlock}>
               <Text style={[styles.featureTitle, { color: palette.text }]}>Barcode Scanner</Text>

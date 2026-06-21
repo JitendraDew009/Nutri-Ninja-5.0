@@ -82,3 +82,54 @@ export async function searchProducts(
 export async function searchProductsByName(query: string) {
   return searchProducts(query);
 }
+
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export async function sendChatMessage(messages: ChatMessage[], profile?: any) {
+  try {
+    const response = await axios.post(
+      `${BACKEND_URL}/chat`,
+      { messages, profile },
+      { timeout: 50000 }
+    );
+    return response.data?.message as string;
+  } catch (error: any) {
+    const detail = error?.response?.data?.detail;
+    throw new Error(
+      typeof detail === "string"
+        ? detail
+        : "Unable to reach the nutrition assistant. Check the backend and internet connection."
+    );
+  }
+}
+
+export async function sendVoiceMessage(
+  audioBase64: string,
+  mimeType: string,
+  messages: ChatMessage[],
+  profile?: any
+) {
+  try {
+    const response = await axios.post(
+      `${BACKEND_URL}/chat/voice`,
+      {
+        audio_base64: audioBase64,
+        mime_type: mimeType,
+        messages,
+        profile,
+      },
+      { timeout: 80000 }
+    );
+    return response.data?.message as string;
+  } catch (error: any) {
+    const detail = error?.response?.data?.detail;
+    throw new Error(
+      typeof detail === "string"
+        ? detail
+        : "Unable to process the voice message. Please try again."
+    );
+  }
+}

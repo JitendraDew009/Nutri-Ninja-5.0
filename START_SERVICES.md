@@ -5,6 +5,8 @@
 ### 1. Start Backend Server
 ```powershell
 cd backend
+Copy-Item .env.example .env
+# Edit .env and set GEMINI_API_KEY before using free-tier AI chat.
 .\venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -23,6 +25,8 @@ npm run web
 ### 1. Start Backend Server
 ```bash
 cd backend
+cp .env.example .env
+# Edit .env and set GEMINI_API_KEY before using free-tier AI chat.
 source venv/bin/activate
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```

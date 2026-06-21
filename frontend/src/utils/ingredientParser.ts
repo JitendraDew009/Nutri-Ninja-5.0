@@ -183,10 +183,10 @@ export function assessIngredientHealth(ingredients: Ingredient[]): {
 
   const warning =
     score >= 70
-      ? '✓ Generally good ingredients'
+      ? 'Generally good ingredients'
       : score >= 50
-        ? '⚠️ Mixed ingredient quality'
-        : '❌ Contains potentially unhealthy items';
+        ? 'Mixed ingredient quality'
+        : 'Contains potentially unhealthy items';
 
   return { score, warning, details };
 }

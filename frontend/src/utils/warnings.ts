@@ -18,13 +18,13 @@ export function getWarnings(product: any): Warning[] {
   // Sugar warnings
   if ((n.sugars_100g || 0) > 25) {
     warnings.push({
-      title: "🍬 High Sugar",
+      title: "High sugar",
       severity: "high",
       message: `${n.sugars_100g}g per 100g - May increase risk of diabetes and obesity`,
     });
   } else if ((n.sugars_100g || 0) > 12.5) {
     warnings.push({
-      title: "🍬 Moderate Sugar",
+      title: "Moderate sugar",
       severity: "medium",
       message: `${n.sugars_100g}g per 100g - Consider limiting intake`,
     });
@@ -33,13 +33,13 @@ export function getWarnings(product: any): Warning[] {
   // Salt warnings
   if ((n.salt_100g || 0) > 1.5) {
     warnings.push({
-      title: "🧂 High Sodium",
+      title: "High sodium",
       severity: "high",
       message: `${n.salt_100g}g per 100g - May increase blood pressure`,
     });
   } else if ((n.salt_100g || 0) > 0.5) {
     warnings.push({
-      title: "🧂 Moderate Sodium",
+      title: "Moderate sodium",
       severity: "medium",
       message: `${n.salt_100g}g per 100g - Use in moderation`,
     });
@@ -48,13 +48,13 @@ export function getWarnings(product: any): Warning[] {
   // Saturated fat warnings
   if ((n["saturated-fat_100g"] || 0) > 5) {
     warnings.push({
-      title: "🧈 High Saturated Fat",
+      title: "High saturated fat",
       severity: "high",
       message: `${n["saturated-fat_100g"]}g per 100g - May increase cholesterol`,
     });
   } else if ((n["saturated-fat_100g"] || 0) > 3) {
     warnings.push({
-      title: "🧈 Moderate Saturated Fat",
+      title: "Moderate saturated fat",
       severity: "medium",
       message: `${n["saturated-fat_100g"]}g per 100g - Not ideal for daily consumption`,
     });
@@ -63,7 +63,7 @@ export function getWarnings(product: any): Warning[] {
   // Energy density warnings
   if ((n.energy_100g || 0) > 400) {
     warnings.push({
-      title: "⚡ High Calorie Density",
+      title: "High calorie density",
       severity: "medium",
       message: `${Math.round(n.energy_100g)} kcal per 100g - High energy density`,
     });
@@ -72,7 +72,7 @@ export function getWarnings(product: any): Warning[] {
   // Positive indicators (no warnings)
   if (warnings.length === 0) {
     warnings.push({
-      title: "✅ Healthy Choice",
+      title: "Balanced choice",
       severity: "low",
       message: "This product has a balanced nutritional profile",
     });

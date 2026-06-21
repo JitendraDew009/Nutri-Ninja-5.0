@@ -1,125 +1,315 @@
 import React, { useState } from "react";
+import { SymbolView } from "expo-symbols";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
-import { UserProfile, readStore, writeStore } from "../utils/localStore";
+import {
+  DEFAULT_PROFILE,
+  UserProfile,
+  getActiveProfile,
+  getFamilyProfiles,
+  saveFamilyProfiles,
+} from "../utils/localStore";
 import { ThemeToggle, useThemeMode } from "../utils/themeMode";
-
-const defaultProfile: UserProfile = {
-  name: "Nutri Ninja User",
-  age: "",
-  weight: "",
-  goal: "general",
-  restrictions: [],
-  allergies: "",
-  conditions: "",
-};
+import { useAuth } from "../components/auth-gate";
 
 const goals: Array<{ key: UserProfile["goal"]; label: string }> = [
-  { key: "general", label: "General Fitness" },
-  { key: "weight_loss", label: "Weight Loss" },
-  { key: "muscle_gain", label: "Muscle Gain" },
+  { key: "general", label: "General wellness" },
+  { key: "weight_loss", label: "Weight management" },
+  { key: "muscle_gain", label: "Muscle gain" },
+  { key: "diabetes", label: "Diabetes support" },
+  { key: "heart_health", label: "Heart health" },
 ];
 
-const restrictions = ["Vegetarian", "Vegan", "Gluten-Free", "Dairy-Free"];
+const relationships: Array<{ key: UserProfile["relationship"]; label: string }> = [
+  { key: "self", label: "Myself" },
+  { key: "spouse", label: "Spouse" },
+  { key: "child", label: "Child" },
+  { key: "parent", label: "Parent" },
+  { key: "other", label: "Other" },
+];
+
+const restrictions = ["Vegetarian", "Vegan", "Gluten-Free", "Dairy-Free", "Low-Sodium"];
 
 export default function ProfileScreen() {
   const { palette } = useThemeMode();
-  const [profile, setProfile] = useState<UserProfile>(() => readStore("userProfile", defaultProfile));
+  const { session, signOut } = useAuth();
+  const [profiles, setProfiles] = useState<UserProfile[]>(getFamilyProfiles);
+  const [activeId, setActiveId] = useState(getActiveProfile().id);
+  const [editingId, setEditingId] = useState(getActiveProfile().id);
+  const [draft, setDraft] = useState<UserProfile>(getActiveProfile);
+
+  const editProfile = (profile: UserProfile) => {
+    setEditingId(profile.id);
+    setDraft({ ...profile, restrictions: [...(profile.restrictions || [])] });
+  };
+
+  const addProfile = () => {
+    const profile: UserProfile = {
+      ...DEFAULT_PROFILE,
+      id: `profile-${Date.now()}`,
+      name: "",
+      relationship: "other",
+    };
+    setEditingId(profile.id);
+    setDraft(profile);
+  };
 
   const toggleRestriction = (item: string) => {
-    const nextRestrictions = profile.restrictions?.includes(item)
-      ? profile.restrictions.filter((value) => value !== item)
-      : [...(profile.restrictions || []), item];
-
-    setProfile({ ...profile, restrictions: nextRestrictions });
+    const selected = draft.restrictions || [];
+    setDraft({
+      ...draft,
+      restrictions: selected.includes(item)
+        ? selected.filter((value) => value !== item)
+        : [...selected, item],
+    });
   };
 
   const saveProfile = () => {
-    writeStore("userProfile", profile);
-    alert("Profile saved");
+    if (!draft.name.trim()) {
+      alert("Please enter a profile name.");
+      return;
+    }
+    const normalized = { ...draft, name: draft.name.trim() };
+    const exists = profiles.some((profile) => profile.id === editingId);
+    const nextProfiles = exists
+      ? profiles.map((profile) => (profile.id === editingId ? normalized : profile))
+      : [...profiles, normalized];
+    setProfiles(nextProfiles);
+    setActiveId(normalized.id);
+    saveFamilyProfiles(nextProfiles, normalized.id);
+    alert("Profile saved and activated.");
+  };
+
+  const activateProfile = (profile: UserProfile) => {
+    setActiveId(profile.id);
+    editProfile(profile);
+    saveFamilyProfiles(profiles, profile.id);
+  };
+
+  const deleteProfile = () => {
+    if (profiles.length <= 1) {
+      alert("At least one profile is required.");
+      return;
+    }
+    const nextProfiles = profiles.filter((profile) => profile.id !== editingId);
+    const nextActive = nextProfiles[0];
+    setProfiles(nextProfiles);
+    setActiveId(nextActive.id);
+    editProfile(nextActive);
+    saveFamilyProfiles(nextProfiles, nextActive.id);
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]} edges={["top", "bottom"]}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-        <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
-          <Text style={[styles.pageTitle, { color: palette.text }]}>Personalized Diets Profile</Text>
-          <Text style={[styles.pageSubtitle, { color: palette.muted }]}>Configure your health goals, allergies, and diagnostics to personalize scoring benchmarks.</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.pageTitle, { color: palette.text }]}>Family profiles</Text>
+            <Text style={[styles.pageSubtitle, { color: palette.muted }]}>
+              Switch between family members to personalize food scores, warnings, and AI guidance.
+            </Text>
+          </View>
+          <ThemeToggle />
+        </View>
+
+        {session ? (
+          <View style={[styles.accountCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <View style={[styles.accountIcon, { backgroundColor: palette.surfaceSoft }]}>
+              <SymbolView name={{ ios: "cloud.fill", android: "cloud_done", web: "cloud_done" }} tintColor={palette.accentBright} size={24} />
+            </View>
+            <View style={styles.accountCopy}>
+              <Text style={[styles.accountTitle, { color: palette.text }]}>Cloud sync active</Text>
+              <Text style={[styles.accountEmail, { color: palette.muted }]}>{session.email}</Text>
+            </View>
+            <TouchableOpacity style={[styles.signOutButton, { borderColor: palette.border }]} onPress={signOut}>
+              <SymbolView name={{ ios: "rectangle.portrait.and.arrow.right", android: "logout", web: "logout" }} tintColor={palette.danger} size={20} />
+              <Text style={[styles.signOutText, { color: palette.danger }]}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        <View style={styles.profileStrip}>
+          {profiles.map((profile) => (
+            <TouchableOpacity
+              key={profile.id}
+              style={[
+                styles.profileCard,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: profile.id === activeId ? palette.accentBright : palette.border,
+                },
+              ]}
+              onPress={() => activateProfile(profile)}
+            >
+              <View style={[styles.avatar, { backgroundColor: palette.surfaceSoft }]}>
+                <SymbolView
+                  name={{ ios: "person.fill", android: "person", web: "person" }}
+                  tintColor={profile.id === activeId ? palette.accentBright : palette.muted}
+                  size={24}
+                />
+              </View>
+              <Text style={[styles.profileName, { color: palette.text }]} numberOfLines={1}>{profile.name}</Text>
+              <Text style={[styles.profileRelation, { color: palette.muted }]}>
+                {relationships.find((item) => item.key === profile.relationship)?.label}
+              </Text>
+              {profile.id === activeId ? (
+                <View style={[styles.activePill, { backgroundColor: palette.accentBright }]}>
+                  <Text style={styles.activePillText}>Active</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            style={[styles.addCard, { borderColor: palette.border }]}
+            onPress={addProfile}
+          >
+            <SymbolView
+              name={{ ios: "person.badge.plus", android: "person_add", web: "person_add" }}
+              tintColor={palette.accentBright}
+              size={28}
+            />
+            <Text style={[styles.addText, { color: palette.text }]}>Add member</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.formCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <View style={styles.formHeader}>
+            <View>
+              <Text style={[styles.formTitle, { color: palette.text }]}>
+                {profiles.some((profile) => profile.id === editingId) ? "Edit profile" : "New family member"}
+              </Text>
+              <Text style={[styles.formSubtitle, { color: palette.muted }]}>Personalization settings</Text>
+            </View>
+            <SymbolView
+              name={{ ios: "slider.horizontal.3", android: "tune", web: "tune" }}
+              tintColor={palette.accentBright}
+              size={25}
+            />
+          </View>
+
+          <Text style={[styles.label, { color: palette.text }]}>Profile name</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
+            value={draft.name}
+            onChangeText={(name) => setDraft({ ...draft, name })}
+            placeholder="e.g. Jitendra, Mom, Aarav"
+            placeholderTextColor={palette.muted}
+          />
+
+          <Text style={[styles.label, { color: palette.text }]}>Relationship</Text>
+          <View style={styles.chipRow}>
+            {relationships.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[
+                  styles.chip,
+                  { borderColor: palette.border, backgroundColor: palette.surfaceSoft },
+                  draft.relationship === item.key && { backgroundColor: palette.accentBright, borderColor: palette.accentBright },
+                ]}
+                onPress={() => setDraft({ ...draft, relationship: item.key })}
+              >
+                <Text style={[styles.chipText, { color: draft.relationship === item.key ? "#071007" : palette.text }]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <View style={styles.rowInput}>
             <View style={styles.flexInput}>
-              <Text style={[styles.fieldLabel, { color: palette.text }]}>Age (years)</Text>
+              <Text style={[styles.label, { color: palette.text }]}>Age</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
-                value={profile.age}
-                onChangeText={(age) => setProfile({ ...profile, age })}
-                placeholder="25"
-                placeholderTextColor="#7b8794"
+                value={draft.age}
+                onChangeText={(age) => setDraft({ ...draft, age })}
+                placeholder="Age"
+                placeholderTextColor={palette.muted}
                 keyboardType="numeric"
               />
             </View>
             <View style={styles.flexInput}>
-              <Text style={[styles.fieldLabel, { color: palette.text }]}>Weight (kg)</Text>
+              <Text style={[styles.label, { color: palette.text }]}>Weight (kg)</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
-                value={profile.weight}
-                onChangeText={(weight) => setProfile({ ...profile, weight })}
-                placeholder="70.0"
-                placeholderTextColor="#7b8794"
+                value={draft.weight}
+                onChangeText={(weight) => setDraft({ ...draft, weight })}
+                placeholder="Weight"
+                placeholderTextColor={palette.muted}
                 keyboardType="numeric"
               />
             </View>
           </View>
 
-          <Text style={[styles.sectionLabel, { color: palette.text }]}>Dietary Health Goal</Text>
+          <Text style={[styles.label, { color: palette.text }]}>Primary health goal</Text>
           <View style={styles.chipRow}>
             {goals.map((goal) => (
               <TouchableOpacity
                 key={goal.key}
-                style={[styles.chip, profile.goal === goal.key && styles.chipActive]}
-                onPress={() => setProfile({ ...profile, goal: goal.key })}
+                style={[
+                  styles.chip,
+                  { borderColor: palette.border, backgroundColor: palette.surfaceSoft },
+                  draft.goal === goal.key && { backgroundColor: palette.accentBright, borderColor: palette.accentBright },
+                ]}
+                onPress={() => setDraft({ ...draft, goal: goal.key })}
               >
-                <Text style={[styles.chipText, profile.goal === goal.key && styles.chipTextActive]}>{goal.label}</Text>
+                <Text style={[styles.chipText, { color: draft.goal === goal.key ? "#071007" : palette.text }]}>
+                  {goal.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <Text style={[styles.sectionLabel, { color: palette.text }]}>Dietary Restrictions (Select multiple)</Text>
+          <Text style={[styles.label, { color: palette.text }]}>Dietary preferences</Text>
           <View style={styles.chipRow}>
-            {restrictions.map((restriction) => (
-              <TouchableOpacity
-                key={restriction}
-                style={[styles.chip, profile.restrictions?.includes(restriction) && styles.chipActive]}
-                onPress={() => toggleRestriction(restriction)}
-              >
-                <Text style={[styles.chipText, profile.restrictions?.includes(restriction) && styles.chipTextActive]}>{restriction}</Text>
-              </TouchableOpacity>
-            ))}
+            {restrictions.map((restriction) => {
+              const selected = draft.restrictions?.includes(restriction);
+              return (
+                <TouchableOpacity
+                  key={restriction}
+                  style={[
+                    styles.chip,
+                    { borderColor: palette.border, backgroundColor: palette.surfaceSoft },
+                    selected && { backgroundColor: palette.accentBright, borderColor: palette.accentBright },
+                  ]}
+                  onPress={() => toggleRestriction(restriction)}
+                >
+                  <Text style={[styles.chipText, { color: selected ? "#071007" : palette.text }]}>{restriction}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <Text style={[styles.sectionLabel, { color: palette.text }]}>Allergies (comma separated)</Text>
-          <TextInput
-            style={[styles.textArea, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
-            value={profile.allergies}
-            onChangeText={(allergies) => setProfile({ ...profile, allergies })}
-            placeholder="peanuts, gluten"
-            placeholderTextColor="#7b8794"
-          />
-          <Text style={[styles.helperText, { color: palette.muted }]}>Scoring will flag allergy warnings if ingredients contain matches listed here.</Text>
+          {[
+            ["Allergies", "allergies", "Peanuts, gluten, shellfish"],
+            ["Health conditions", "conditions", "Diabetes, hypertension"],
+            ["Ingredients to avoid", "dislikedIngredients", "Palm oil, artificial sweeteners"],
+          ].map(([label, key, placeholder]) => (
+            <View key={key}>
+              <Text style={[styles.label, { color: palette.text }]}>{label}</Text>
+              <TextInput
+                style={[styles.textArea, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
+                value={String(draft[key as keyof UserProfile] || "")}
+                onChangeText={(value) => setDraft({ ...draft, [key]: value })}
+                placeholder={placeholder}
+                placeholderTextColor={palette.muted}
+              />
+            </View>
+          ))}
 
-          <Text style={[styles.sectionLabel, { color: palette.text }]}>Diagnostics/Conditions (comma separated)</Text>
-          <TextInput
-            style={[styles.textArea, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
-            value={profile.conditions}
-            onChangeText={(conditions) => setProfile({ ...profile, conditions })}
-            placeholder="diabetes, hypertension"
-            placeholderTextColor="#7b8794"
-          />
-
-          <TouchableOpacity style={styles.button} onPress={saveProfile}>
-            <Text style={styles.buttonText}>Save Profile</Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            {profiles.some((profile) => profile.id === editingId) && profiles.length > 1 ? (
+              <TouchableOpacity style={[styles.deleteButton, { borderColor: palette.danger }]} onPress={deleteProfile}>
+                <SymbolView name={{ ios: "trash", android: "delete", web: "delete" }} tintColor={palette.danger} size={20} />
+                <Text style={[styles.deleteText, { color: palette.danger }]}>Delete</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={[styles.saveButton, { backgroundColor: palette.accentBright }]} onPress={saveProfile}>
+              <SymbolView name={{ ios: "checkmark", android: "check", web: "check" }} tintColor="#071007" size={20} />
+              <Text style={styles.saveText}>Save and activate</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -128,40 +318,42 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, paddingBottom: 30 },
-  card: { borderRadius: 20, borderWidth: 1, padding: 18, marginTop: 14 },
-  pageTitle: { fontSize: 24, fontWeight: "900", marginBottom: 6 },
-  pageSubtitle: { fontSize: 13, lineHeight: 20, marginBottom: 18 },
-  rowInput: { flexDirection: "row", gap: 12, marginBottom: 16 },
+  content: { padding: 16, paddingBottom: 36 },
+  header: { alignItems: "flex-start", flexDirection: "row", gap: 12, marginBottom: 18 },
+  headerCopy: { flex: 1 },
+  pageTitle: { fontSize: 27, fontWeight: "900" },
+  pageSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 5 },
+  accountCard: { alignItems: "center", borderRadius: 18, borderWidth: 1, flexDirection: "row", gap: 12, marginBottom: 18, padding: 14 },
+  accountIcon: { alignItems: "center", borderRadius: 16, height: 44, justifyContent: "center", width: 44 },
+  accountCopy: { flex: 1 },
+  accountTitle: { fontSize: 14, fontWeight: "900" },
+  accountEmail: { fontSize: 11, marginTop: 3 },
+  signOutButton: { alignItems: "center", borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 11, paddingVertical: 9 },
+  signOutText: { fontSize: 11, fontWeight: "900" },
+  profileStrip: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 18 },
+  profileCard: { borderRadius: 18, borderWidth: 2, minHeight: 142, padding: 13, width: 122 },
+  avatar: { alignItems: "center", borderRadius: 16, height: 42, justifyContent: "center", marginBottom: 10, width: 42 },
+  profileName: { fontSize: 14, fontWeight: "900" },
+  profileRelation: { fontSize: 11, marginTop: 3 },
+  activePill: { alignSelf: "flex-start", borderRadius: 99, marginTop: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  activePillText: { color: "#071007", fontSize: 10, fontWeight: "900" },
+  addCard: { alignItems: "center", borderRadius: 18, borderStyle: "dashed", borderWidth: 1, justifyContent: "center", minHeight: 142, width: 122 },
+  addText: { fontSize: 12, fontWeight: "800", marginTop: 9 },
+  formCard: { borderRadius: 22, borderWidth: 1, padding: 18 },
+  formHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
+  formTitle: { fontSize: 20, fontWeight: "900" },
+  formSubtitle: { fontSize: 12, marginTop: 3 },
+  label: { fontSize: 12, fontWeight: "800", marginBottom: 8, marginTop: 8 },
+  input: { borderRadius: 14, borderWidth: 1, fontSize: 14, height: 48, paddingHorizontal: 14 },
+  textArea: { borderRadius: 14, borderWidth: 1, fontSize: 14, minHeight: 54, paddingHorizontal: 14, paddingTop: 14 },
+  rowInput: { flexDirection: "row", gap: 12 },
   flexInput: { flex: 1 },
-  fieldLabel: { color: "#334155", fontSize: 12, fontWeight: "700", marginBottom: 8 },
-  sectionLabel: { fontSize: 13, fontWeight: "700", marginBottom: 10, marginTop: 6 },
-  input: {
-    borderColor: "#d1d5db",
-    borderRadius: 14,
-    borderWidth: 1,
-    color: "#111827",
-    fontSize: 14,
-    height: 48,
-    paddingHorizontal: 14,
-  },
-  textArea: {
-    borderColor: "#d1d5db",
-    borderRadius: 14,
-    borderWidth: 1,
-    color: "#111827",
-    fontSize: 14,
-    minHeight: 56,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    marginBottom: 8,
-  },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 18 },
-  chip: { backgroundColor: "#f3f4f6", borderRadius: 999, borderColor: "#d1d5db", borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
-  chipActive: { backgroundColor: "#2f6f2d", borderColor: "#2f6f2d" },
-  chipText: { color: "#334155", fontSize: 12, fontWeight: "700" },
-  chipTextActive: { color: "#fff" },
-  helperText: { fontSize: 12, lineHeight: 18, marginBottom: 16 },
-  button: { alignItems: "center", backgroundColor: "#264e24", borderRadius: 16, paddingVertical: 14 },
-  buttonText: { color: "#fff", fontSize: 15, fontWeight: "900" },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  chip: { borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
+  chipText: { fontSize: 11, fontWeight: "800" },
+  actionRow: { flexDirection: "row", gap: 10, justifyContent: "flex-end", marginTop: 20 },
+  deleteButton: { alignItems: "center", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 7, paddingHorizontal: 16, paddingVertical: 13 },
+  deleteText: { fontSize: 13, fontWeight: "900" },
+  saveButton: { alignItems: "center", borderRadius: 14, flexDirection: "row", gap: 7, justifyContent: "center", paddingHorizontal: 18, paddingVertical: 13 },
+  saveText: { color: "#071007", fontSize: 13, fontWeight: "900" },
 });

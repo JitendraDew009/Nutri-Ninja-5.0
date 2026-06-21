@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { SymbolView } from "expo-symbols";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  ActivityIndicator,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,170 +12,382 @@ import {
   View,
 } from "react-native";
 
+import { ChatMessage, sendChatMessage, sendVoiceMessage } from "../services/api";
+import { getActiveProfile } from "../utils/localStore";
 import { useThemeMode } from "../utils/themeMode";
 
-const defaultResponses = [
-  { sender: "assistant", text: "Hi! I can help with food scores, ingredient checks, and basket guidance." },
-  { sender: "assistant", text: "Ask me what to avoid, what to add, or start a live chat below." },
+const welcome: ChatMessage[] = [
+  {
+    role: "assistant",
+    content:
+      "Hi! I'm your Nutri Ninja assistant. Ask about ingredients, food labels, healthier swaps, or your grocery basket.",
+  },
 ];
 
 export default function ExploreScreen() {
   const { mode, palette } = useThemeMode();
-  const [voiceQuestion, setVoiceQuestion] = useState("Is this product healthy?");
-  const [voiceAnswer, setVoiceAnswer] = useState("");
-  const [chatText, setChatText] = useState("");
-  const [chatMessages, setChatMessages] = useState<Array<{ sender: string; text: string }>>(defaultResponses);
+  const [messages, setMessages] = useState<ChatMessage[]>(welcome);
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceReplies, setVoiceReplies] = useState(true);
+  const scrollRef = useRef<ScrollView | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  const answerVoiceQuestion = (question = voiceQuestion) => {
-    if (!question.trim()) {
-      setVoiceAnswer("Type or ask a question to get nutrition guidance.");
+  const speak = (text: string) => {
+    if (
+      !voiceReplies ||
+      Platform.OS !== "web" ||
+      typeof window === "undefined" ||
+      !("speechSynthesis" in window)
+    ) {
       return;
     }
 
-    const lower = question.toLowerCase();
-    if (lower.includes("healthy") || lower.includes("score")) {
-      setVoiceAnswer("For a healthy choice, look for low sugar, high fiber, and balanced protein. Scan a product to get a score.");
-      return;
-    }
-
-    if (lower.includes("avoid")) {
-      setVoiceAnswer("Avoid products high in added sugar, saturated fat, and artificial additives when possible.");
-      return;
-    }
-
-    setVoiceAnswer("I recommend scanning the product or asking about calories, allergens, or dietary goals.");
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-IN";
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
   };
 
-  const startVoiceInput = () => {
-    if (Platform.OS !== "web" || typeof window === "undefined") {
-      answerVoiceQuestion();
-      return;
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setVoiceAnswer("Voice input is not available in this browser. Please type your question instead.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-IN";
-    recognition.interimResults = false;
-    recognition.onresult = (event: any) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || voiceQuestion;
-      setVoiceQuestion(transcript);
-      answerVoiceQuestion(transcript);
-    };
-    recognition.onerror = () => setVoiceAnswer("I couldn't understand that. Try speaking clearly or type your question.");
-    recognition.start();
+  const toggleVoiceReplies = () => {
+    setVoiceReplies((enabled) => {
+      const nextEnabled = !enabled;
+      if (!nextEnabled && Platform.OS === "web" && typeof window !== "undefined") {
+        window.speechSynthesis?.cancel();
+      }
+      return nextEnabled;
+    });
   };
 
-  const sendChatMessage = () => {
-    if (!chatText.trim()) return;
-    const nextMessages = [...chatMessages, { sender: "user", text: chatText.trim() }];
-    setChatMessages(nextMessages);
-    setChatText("");
-    setTimeout(() => {
-      setChatMessages((messages) => [
-        ...messages,
+  const submitMessage = async (text = draft) => {
+    const content = text.trim();
+    if (!content || loading) return;
+
+    const nextMessages: ChatMessage[] = [
+      ...messages,
+      { role: "user", content },
+    ];
+    setMessages(nextMessages);
+    setDraft("");
+    setLoading(true);
+
+    try {
+      const profile = getActiveProfile();
+      const answer = await sendChatMessage(nextMessages, profile);
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", content: answer },
+      ]);
+      speak(answer);
+    } catch (error: any) {
+      setMessages((current) => [
+        ...current,
         {
-          sender: "assistant",
-          text: `You said: "${chatText.trim()}". Our live assistant will respond with product-specific guidance once available.`,
+          role: "assistant",
+          content: error?.message || "I couldn't answer just now. Please try again.",
         },
       ]);
-    }, 600);
+    } finally {
+      setLoading(false);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    }
+  };
+
+  const blobToBase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Could not read the voice recording."));
+      reader.onloadend = () =>
+        resolve(String(reader.result || "").split(",")[1] || "");
+      reader.readAsDataURL(blob);
+    });
+
+  const submitVoiceMessage = async (blob: Blob) => {
+    if (!blob.size) return;
+    setLoading(true);
+    setMessages((current) => [
+      ...current,
+      { role: "user", content: "Voice message" },
+    ]);
+    try {
+      const profile = getActiveProfile();
+      const audioBase64 = await blobToBase64(blob);
+      const answer = await sendVoiceMessage(
+        audioBase64,
+        blob.type || "audio/webm",
+        messages,
+        profile
+      );
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", content: answer },
+      ]);
+      speak(answer);
+    } catch (error: any) {
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: error?.message || "I couldn't process that voice message.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startVoiceChat = async () => {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: "Voice chat is currently available in supported web browsers. You can still type here.",
+        },
+      ]);
+      return;
+    }
+
+    if (listening && recorderRef.current) {
+      recorderRef.current.stop();
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: "This browser cannot record microphone audio. Try a current Chrome or Edge browser.",
+        },
+      ]);
+      return;
+    }
+
+    try {
+      window.speechSynthesis?.cancel();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const preferredType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType: preferredType });
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        recorderRef.current = null;
+        setListening(false);
+        submitVoiceMessage(blob);
+      };
+      recorder.start();
+      setListening(true);
+    } catch (error: any) {
+      setListening(false);
+      const denied = error?.name === "NotAllowedError";
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: denied
+            ? "Microphone permission is blocked. Allow microphone access in the browser's site settings, then try again."
+            : "The microphone could not start. Check that another app is not using it.",
+        },
+      ]);
+    }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]} edges={["top", "bottom"]}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: palette.text }]}>Voice & Live Chat</Text>
-          <Text style={[styles.subtitle, { color: palette.muted }]}>Ask the nutrition assistant by voice or chat with our live help desk.</Text>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: palette.background }]}
+      edges={["top"]}
+    >
+      <View style={styles.header}>
+        <View>
+          <Text style={[styles.title, { color: palette.text }]}>AI Nutrition Assistant</Text>
+          <Text style={[styles.subtitle, { color: palette.muted }]}>
+            Tap once to record, speak, then tap again to send.
+          </Text>
         </View>
-
-        <View style={[styles.panel, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
-          <Text style={[styles.panelTitle, { color: palette.text }]}>Voice Assistant</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
-            value={voiceQuestion}
-            onChangeText={setVoiceQuestion}
-            placeholder="Ask a food question"
-            placeholderTextColor={mode === "day" ? "#7b8794" : "#8c9bb3"}
+        <TouchableOpacity
+          style={[styles.soundButton, { backgroundColor: palette.surfaceSoft }]}
+          onPress={toggleVoiceReplies}
+          accessibilityRole="button"
+          accessibilityLabel={voiceReplies ? "Mute spoken replies" : "Enable spoken replies"}
+        >
+          <SymbolView
+            name={{
+              ios: voiceReplies ? "speaker.wave.2.fill" : "speaker.slash.fill",
+              android: voiceReplies ? "volume_up" : "volume_off",
+              web: voiceReplies ? "volume_up" : "volume_off",
+            }}
+            tintColor={voiceReplies ? palette.accentBright : palette.muted}
+            size={22}
           />
-          <View style={styles.row}>
-            <TouchableOpacity style={[styles.primaryButton, styles.flex, { backgroundColor: palette.accentBright }]} onPress={startVoiceInput}>
-              <Text style={styles.primaryButtonText}>Ask by Voice</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.secondaryButtonInline, styles.flex]} onPress={() => answerVoiceQuestion()}>
-              <Text style={styles.secondaryButtonText}>Get Answer</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={[styles.answerBox, { backgroundColor: palette.surfaceSoft, borderColor: palette.border }]}> 
-            <Text style={[styles.answerText, { color: palette.text }]}>{voiceAnswer || "Your answer will appear here."}</Text>
-          </View>
-        </View>
+        </TouchableOpacity>
+      </View>
 
-        <View style={[styles.panel, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
-          <Text style={[styles.panelTitle, { color: palette.text }]}>Live Chat</Text>
-          <View style={styles.chatWindow}>
-            {chatMessages.map((message, index) => (
-              <View
-                key={`${message.sender}-${index}`}
-                style={[
-                  styles.chatBubble,
-                  message.sender === "assistant" ? styles.chatAssistant : styles.chatUser,
-                ]}
-              >
-                <Text style={[styles.chatText, { color: message.sender === "assistant" ? palette.text : "#000" }]}>{message.text}</Text>
-              </View>
-            ))}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.chat}
+        contentContainerStyle={styles.chatContent}
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+      >
+        {messages.map((message, index) => {
+          const assistant = message.role === "assistant";
+          return (
+            <View
+              key={`${message.role}-${index}`}
+              style={[
+                styles.bubble,
+                assistant ? styles.assistantBubble : styles.userBubble,
+                {
+                  backgroundColor: assistant ? palette.surface : palette.accentBright,
+                  borderColor: assistant ? palette.border : palette.accentBright,
+                },
+              ]}
+            >
+              <Text style={[styles.message, { color: assistant ? palette.text : "#08110a" }]}>
+                {message.content}
+              </Text>
+            </View>
+          );
+        })}
+        {loading ? (
+          <View style={[styles.thinking, { backgroundColor: palette.surface }]}>
+            <ActivityIndicator color={palette.accentBright} />
+            <Text style={{ color: palette.muted }}>Nutri Ninja is thinking...</Text>
           </View>
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.chatInput, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
-              value={chatText}
-              onChangeText={setChatText}
-              placeholder="Start a live chat message"
-              placeholderTextColor={mode === "day" ? "#7b8794" : "#8c9bb3"}
-            />
-            <TouchableOpacity style={[styles.primaryButton, styles.chatButton]} onPress={sendChatMessage}>
-              <Text style={styles.primaryButtonText}>Send</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={{ height: 32 }} />
+        ) : null}
       </ScrollView>
+
+      <View style={[styles.composer, { backgroundColor: palette.header, borderColor: palette.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.micButton,
+            { backgroundColor: listening ? "#ef4444" : palette.surfaceSoft },
+          ]}
+          onPress={startVoiceChat}
+          disabled={loading}
+        >
+          <SymbolView
+            name={{ ios: "mic.fill", android: "mic", web: "mic" }}
+            tintColor={listening ? "#fff" : palette.accentBright}
+            size={25}
+          />
+        </TouchableOpacity>
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surfaceSoft,
+              borderColor: palette.border,
+              color: palette.text,
+            },
+          ]}
+          value={draft}
+          onChangeText={setDraft}
+          onSubmitEditing={() => submitMessage()}
+          placeholder={listening ? "Recording... tap mic to send" : "Ask about nutrition or food"}
+          placeholderTextColor={mode === "day" ? "#7b8794" : "#8c9bb3"}
+          returnKeyType="send"
+          editable={!loading}
+        />
+        <TouchableOpacity
+          style={[styles.sendButton, { backgroundColor: palette.accentBright }]}
+          onPress={() => submitMessage()}
+          disabled={loading || !draft.trim()}
+        >
+          <SymbolView
+            name={{ ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" }}
+            tintColor="#071007"
+            size={23}
+          />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, paddingBottom: 30 },
-  header: { marginBottom: 18 },
-  title: { fontSize: 28, fontWeight: "900" },
-  subtitle: { fontSize: 14, lineHeight: 20, marginTop: 6 },
-  panel: { borderRadius: 20, borderWidth: 1, marginBottom: 16, padding: 18 },
-  panelTitle: { fontSize: 18, fontWeight: "900", marginBottom: 14 },
-  input: { borderRadius: 16, borderWidth: 1, fontSize: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14 },
-  row: { flexDirection: "row", gap: 10 },
-  flex: { flex: 1 },
-  primaryButton: { alignItems: "center", borderRadius: 16, paddingVertical: 14 },
-  primaryButtonText: { color: "#000", fontSize: 14, fontWeight: "900" },
-  secondaryButtonInline: { alignItems: "center", borderColor: "#76FF03", borderRadius: 16, borderWidth: 1, paddingVertical: 14 },
-  secondaryButtonText: { color: "#76FF03", fontSize: 14, fontWeight: "900" },
-  answerBox: { borderRadius: 16, borderWidth: 1, marginTop: 14, padding: 14 },
-  answerText: { fontSize: 14, lineHeight: 20 },
-  chatWindow: { maxHeight: 320, marginBottom: 14 },
-  chatBubble: { borderRadius: 16, marginBottom: 10, padding: 12 },
-  chatAssistant: { backgroundColor: "rgba(118, 255, 3, 0.1)" },
-  chatUser: { backgroundColor: "#d1d5db", alignSelf: "flex-end" },
-  chatText: { fontSize: 14, lineHeight: 20 },
-  chatInput: { borderRadius: 16, borderWidth: 1, flex: 1, fontSize: 14, paddingHorizontal: 14, paddingVertical: 12 },
-  chatButton: { borderRadius: 16, paddingHorizontal: 18 },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+    paddingTop: 10,
+  },
+  title: { fontSize: 24, fontWeight: "900" },
+  subtitle: { fontSize: 13, lineHeight: 18, marginTop: 4, maxWidth: 310 },
+  soundButton: {
+    alignItems: "center",
+    borderRadius: 18,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  chat: { flex: 1 },
+  chatContent: { padding: 16, paddingBottom: 24 },
+  bubble: {
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 12,
+    maxWidth: "86%",
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+  },
+  assistantBubble: { alignSelf: "flex-start", borderBottomLeftRadius: 5 },
+  userBubble: { alignSelf: "flex-end", borderBottomRightRadius: 5 },
+  message: { fontSize: 14, lineHeight: 21 },
+  thinking: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: 18,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+  },
+  composer: {
+    alignItems: "center",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "web" ? 12 : 10,
+  },
+  micButton: {
+    alignItems: "center",
+    borderRadius: 22,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  input: {
+    borderRadius: 22,
+    borderWidth: 1,
+    flex: 1,
+    fontSize: 14,
+    minHeight: 46,
+    paddingHorizontal: 16,
+  },
+  sendButton: {
+    alignItems: "center",
+    borderRadius: 22,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
 });

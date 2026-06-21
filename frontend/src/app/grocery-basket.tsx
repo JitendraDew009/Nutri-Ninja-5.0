@@ -9,12 +9,14 @@ import {
 } from "react-native";
 
 import { getHealthScore, getHealthScoreColor, getHealthScoreLabel } from "../utils/healthScore";
-import { readStore, writeStore } from "../utils/localStore";
+import { getActiveProfile, profileStoreKey, readStore, writeStore } from "../utils/localStore";
 import { ThemeToggle, useThemeMode } from "../utils/themeMode";
 
 export default function GroceryBasketScreen() {
   const { palette } = useThemeMode();
-  const [basket, setBasket] = useState<any[]>(() => readStore("groceryBasket", []));
+  const activeProfile = getActiveProfile();
+  const basketKey = profileStoreKey("groceryBasket", activeProfile.id);
+  const [basket, setBasket] = useState<any[]>(() => readStore(basketKey, []));
 
   const basketScore = useMemo(() => {
     if (!basket.length) return 0;
@@ -24,12 +26,12 @@ export default function GroceryBasketScreen() {
 
   const clearBasket = () => {
     setBasket([]);
-    writeStore("groceryBasket", []);
+    writeStore(basketKey, []);
   };
 
   useEffect(() => {
-    setBasket(readStore("groceryBasket", []));
-  }, []);
+    setBasket(readStore(basketKey, []));
+  }, [basketKey]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]} edges={["top", "bottom"]}>
@@ -38,7 +40,9 @@ export default function GroceryBasketScreen() {
           <View style={styles.headerRow}>
             <View style={styles.flex}>
               <Text style={[styles.title, { color: palette.text }]}>Grocery Basket</Text>
-              <Text style={[styles.subtitle, { color: palette.muted }]}>Track your selected items and basket health in one place.</Text>
+              <Text style={[styles.subtitle, { color: palette.muted }]}>
+                {activeProfile.name}'s personalized grocery selections and basket health.
+              </Text>
             </View>
             <ThemeToggle />
           </View>
