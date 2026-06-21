@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,15 +13,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 
 import ProductDetailScreen from "./ProductDetailScreen";
+import OCRLabelReader from "../components/ocr-label-reader";
+import ProductImage from "../components/product-image";
 import { fetchProduct, searchProducts } from "../services/api";
 import { getHealthScore, getHealthScoreColor, getNutriScore, getNutriScoreColor } from "../utils/healthScore";
 import { productSummary, readStore, writeStore, UserProfile } from "../utils/localStore";
 import { useThemeMode } from "../utils/themeMode";
+import { getProductImageUrl, getProductImageUrls } from "../utils/productImage";
 
 interface Suggestion {
   id: string;
   name: string;
   image: string;
+  imageUrls: string[];
   barcode?: string;
   brand?: string;
   nutriScore: string;
@@ -150,7 +153,8 @@ export default function ScannerScreen() {
               id: `${product.code || index}`,
               name: product.product_name || "Unknown product",
               brand: product.brands || "",
-              image: product.image_front_url || product.image_url || "",
+              image: getProductImageUrl(product),
+              imageUrls: getProductImageUrls(product),
               barcode: product.code,
               nutriScore,
               nutriColor: getNutriScoreColor(nutriScore),
@@ -284,7 +288,11 @@ export default function ScannerScreen() {
 
               {suggestions.map((item) => (
                 <TouchableOpacity key={item.id} style={styles.suggestionItem} onPress={() => handleSelectSuggestion(item)}>
-                  {item.image ? <Image source={{ uri: item.image }} style={styles.suggestionImage} /> : <View style={styles.emptyImage} />}
+                  <ProductImage
+                    urls={item.imageUrls}
+                    style={styles.suggestionImage}
+                    placeholderStyle={styles.emptyImage}
+                  />
                   <View style={styles.suggestionTextWrap}>
                     <Text style={[styles.suggestionName, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
                     <Text style={[styles.suggestionBrand, { color: palette.muted }]} numberOfLines={1}>{item.brand || item.barcode || "Open Food Facts"}</Text>

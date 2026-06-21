@@ -111,11 +111,28 @@ def warnings(product: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def product_summary(product: dict[str, Any]) -> dict[str, Any]:
+    image_url = (
+        product.get("image_front_url")
+        or product.get("image_url")
+        or product.get("image_front_small_url")
+        or product.get("image_small_url")
+        or product.get("image_front_thumb_url")
+        or product.get("image_thumb_url")
+        or ""
+    )
+    if isinstance(image_url, str) and image_url.startswith("http://"):
+        image_url = f"https://{image_url[7:]}"
+
     return {
         "code": product.get("code") or product.get("_id"),
         "product_name": product.get("product_name") or "Unknown product",
         "brands": product.get("brands") or "",
-        "image_front_url": product.get("image_front_url") or product.get("image_url") or "",
+        "image_front_url": image_url,
+        "image_url": image_url,
+        "image_front_small_url": product.get("image_front_small_url") or "",
+        "image_small_url": product.get("image_small_url") or "",
+        "image_front_thumb_url": product.get("image_front_thumb_url") or "",
+        "image_thumb_url": product.get("image_thumb_url") or "",
         "categories": product.get("categories") or product.get("categories_en") or "",
         "nutriments": product.get("nutriments") or {},
         "health_score": health_score(product),

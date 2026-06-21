@@ -4,6 +4,7 @@
  */
 
 import { getHealthScore } from "./healthScore";
+import { getProductImageUrl } from "./productImage";
 
 export interface RecommendationItem {
   name: string;
@@ -33,7 +34,7 @@ export function getRecommendations(currentProduct: any, products: any[]): Recomm
       name: item.product_name,
       brand: item.brands || "",
       score: getHealthScore(item),
-      image: item.image_front_url || item.image_url || "",
+      image: getProductImageUrl(item),
       code: item.code || item._id || "",
     }))
     // Remove duplicates and current product

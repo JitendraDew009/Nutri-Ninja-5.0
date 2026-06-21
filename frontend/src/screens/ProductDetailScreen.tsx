@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   FlatList,
   ActivityIndicator,
   useWindowDimensions,
@@ -14,6 +13,7 @@ import { getHealthScore, getNutriScore, getHealthScoreColor, getNutriScoreColor,
 import { getWarnings, getNutritionInfo, getWarningColor } from "../utils/warnings";
 import { getRecommendations, RecommendationItem, Recommendations } from "../utils/recommendations";
 import { readStore, UserProfile } from "../utils/localStore";
+import ProductImage from "../components/product-image";
 
 interface ProductDetailsProps {
   product: any;
@@ -74,15 +74,6 @@ export default function ProductDetailScreen({
   const profile = readStore<UserProfile | null>("userProfile", null);
   const personalizedInsights = getPersonalizedInsights(product, profile);
 
-  const productImageUri =
-    product.image_front_url ||
-    product.image_url ||
-    product.image ||
-    product.image_small_url ||
-    product.image_thumb_url ||
-    product.image_front_small_url ||
-    "";
-
   const ingredientText =
     product.ingredients_text ||
     product.ingredients_text_en ||
@@ -109,13 +100,13 @@ export default function ProductDetailScreen({
       showsVerticalScrollIndicator={false}
     >
       <View style={[styles.imageWrapper, isWide && styles.imageWrapperWide]}>
-        {productImageUri ? (
-          <Image source={{ uri: productImageUri }} style={styles.productImage} />
-        ) : (
-          <View style={styles.productImagePlaceholder}>
-            <Text style={styles.placeholderText}>No image available</Text>
-          </View>
-        )}
+        <ProductImage
+          product={product}
+          style={styles.productImage}
+          placeholderStyle={styles.productImagePlaceholder}
+          placeholderTextStyle={styles.placeholderText}
+          placeholderText="No image available"
+        />
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Text style={styles.closeBtn}>✕ Close</Text>
@@ -239,9 +230,11 @@ export default function ProductDetailScreen({
               contentContainerStyle={styles.recommendationList}
               renderItem={({ item }: { item: RecommendationItem }) => (
                 <TouchableOpacity style={styles.recommendationCard} activeOpacity={0.85} onPress={() => handleSelectRecommendation(item)}>
-                  {item.image ? (
-                    <Image source={{ uri: item.image }} style={styles.recommendationImage} />
-                  ) : null}
+                  <ProductImage
+                    urls={[item.image]}
+                    style={styles.recommendationImage}
+                    placeholderStyle={styles.recommendationImage}
+                  />
                   <View style={styles.recommendationBadge}>
                     <Text style={styles.recommendationScore}>{item.score}</Text>
                   </View>
@@ -266,9 +259,11 @@ export default function ProductDetailScreen({
               contentContainerStyle={styles.recommendationList}
               renderItem={({ item }: { item: RecommendationItem }) => (
                 <TouchableOpacity style={styles.recommendationCard} activeOpacity={0.85} onPress={() => handleSelectRecommendation(item)}>
-                  {item.image ? (
-                    <Image source={{ uri: item.image }} style={styles.recommendationImage} />
-                  ) : null}
+                  <ProductImage
+                    urls={[item.image]}
+                    style={styles.recommendationImage}
+                    placeholderStyle={styles.recommendationImage}
+                  />
                   <View style={[styles.recommendationBadge, styles.recommendationBadgeWarning]}>
                     <Text style={styles.recommendationScore}>{item.score}</Text>
                   </View>
@@ -308,11 +303,11 @@ const styles = StyleSheet.create({
   imageWrapper: {
     position: "relative",
     width: "100%",
-    minHeight: 240,
+    height: 280,
     backgroundColor: "#1a1f26",
   },
   imageWrapperWide: {
-    minHeight: 340,
+    height: 380,
   },
   productImage: {
     width: "100%",

@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform, Text } from "react-native";
+import { Platform } from "react-native";
 import { ThemeModeProvider, useThemeMode } from "../utils/themeMode";
 
 export default function Layout() {
@@ -38,8 +39,12 @@ function ThemedTabs() {
         name="index"
         options={{
           title: "Scan/Search",
-          tabBarIcon: () => (
-            <Text style={{ color: "#fff", fontSize: 22 }}>🔎</Text>
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView
+              name={{ ios: "magnifyingglass", android: "search", web: "search" }}
+              tintColor={color}
+              size={size}
+            />
           ),
         }}
       />
@@ -47,8 +52,12 @@ function ThemedTabs() {
         name="history"
         options={{
           title: "Ninja Hub",
-          tabBarIcon: () => (
-            <Text style={{ color: "#fff", fontSize: 22 }}>🥷</Text>
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView
+              name={{ ios: "square.grid.2x2.fill", android: "dashboard", web: "dashboard" }}
+              tintColor={color}
+              size={size}
+            />
           ),
         }}
       />
@@ -56,8 +65,12 @@ function ThemedTabs() {
         name="grocery-basket"
         options={{
           title: "Grocery Basket",
-          tabBarIcon: () => (
-            <Text style={{ color: "#fff", fontSize: 22 }}>🧺</Text>
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView
+              name={{ ios: "basket.fill", android: "shopping_basket", web: "shopping_basket" }}
+              tintColor={color}
+              size={size}
+            />
           ),
         }}
       />
@@ -65,8 +78,12 @@ function ThemedTabs() {
         name="profile"
         options={{
           title: "Diet Profile",
-          tabBarIcon: () => (
-            <Text style={{ color: "#fff", fontSize: 22 }}>📋</Text>
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView
+              name={{ ios: "person.text.rectangle.fill", android: "assignment_ind", web: "assignment_ind" }}
+              tintColor={color}
+              size={size}
+            />
           ),
         }}
       />
