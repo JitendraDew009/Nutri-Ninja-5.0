@@ -145,7 +145,7 @@ export default function HistoryScreen() {
                 onPress={() => switchProfile(profile)}
               >
                 <View style={[styles.profileAvatar, { backgroundColor: active ? palette.accentBright : palette.surfaceSoft }]}>
-                  <Text style={[styles.profileInitial, { color: active ? "#06120c" : palette.text }]}>
+                  <Text style={[styles.profileInitial, { color: active ? palette.onAccent : palette.text }]}>
                     {profile.name.trim().charAt(0).toUpperCase() || "U"}
                   </Text>
                 </View>
@@ -229,15 +229,15 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 18, paddingBottom: 34 },
-  heroCard: { alignItems: "center", borderRadius: 24, borderWidth: 1, flexDirection: "row", marginBottom: 24, padding: 22 },
+  content: { padding: 16, paddingBottom: 34 },
+  heroCard: { alignItems: "center", borderRadius: 20, borderWidth: 1, flexDirection: "row", marginBottom: 24, padding: 22 },
   heroCopy: { flex: 1 },
   heroIcon: { alignItems: "center", borderRadius: 36, height: 72, justifyContent: "center", marginLeft: 14, width: 72 },
-  heroTitle: { fontSize: 26, fontWeight: "900", marginBottom: 8 },
-  heroGoal: { fontSize: 14, fontWeight: "800", marginBottom: 12 },
-  heroQuote: { fontSize: 14, lineHeight: 20 },
+  heroTitle: { fontSize: 24, fontWeight: "900", marginBottom: 8 },
+  heroGoal: { fontSize: 13, fontWeight: "800", marginBottom: 12 },
+  heroQuote: { fontSize: 13, lineHeight: 20 },
   sectionHeadingRow: { marginBottom: 12 },
-  sectionHeading: { fontSize: 20, fontWeight: "900" },
+  sectionHeading: { fontSize: 18, fontWeight: "900" },
   profileList: { gap: 10, paddingBottom: 22 },
   profileChip: { alignItems: "center", borderRadius: 18, borderWidth: 2, minWidth: 92, padding: 12 },
   profileAvatar: { alignItems: "center", borderRadius: 24, height: 48, justifyContent: "center", width: 48 },
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 28, fontWeight: "900" },
   recentCard: { marginBottom: 12 },
   recentHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 14 },
-  recentTitle: { fontSize: 20, fontWeight: "900" },
+  recentTitle: { fontSize: 18, fontWeight: "900" },
   clearAction: { alignItems: "center", flexDirection: "row", gap: 6 },
   clearText: { fontSize: 13, fontWeight: "700" },
   scanRow: { alignItems: "center", borderRadius: 18, borderWidth: 1, flexDirection: "row", gap: 12, justifyContent: "space-between", marginBottom: 10, padding: 13 },

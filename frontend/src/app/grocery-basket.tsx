@@ -76,8 +76,11 @@ export default function GroceryBasketScreen() {
               ))}
             </View>
 
-            <TouchableOpacity style={styles.clearButton} onPress={clearBasket}>
-              <Text style={styles.clearButtonText}>Clear basket</Text>
+            <TouchableOpacity
+              style={[styles.clearButton, { borderColor: palette.danger }]}
+              onPress={clearBasket}
+            >
+              <Text style={[styles.clearButtonText, { color: palette.danger }]}>Clear basket</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -101,7 +104,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   title: { fontSize: 24, fontWeight: "900" },
   subtitle: { fontSize: 13, lineHeight: 18, marginTop: 6 },
-  card: { borderRadius: 18, borderWidth: 1, padding: 16, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
+  card: { borderRadius: 20, borderWidth: 1, padding: 16 },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
   statBox: { flex: 1, borderRadius: 12, padding: 14 },
   statLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
@@ -114,9 +117,9 @@ const styles = StyleSheet.create({
   itemBrand: { fontSize: 12, marginTop: 4 },
   itemScore: { alignItems: "center", borderRadius: 999, minWidth: 42, paddingVertical: 8, paddingHorizontal: 12 },
   itemScoreText: { color: "#fff", fontSize: 14, fontWeight: "900" },
-  clearButton: { alignItems: "center", backgroundColor: "#0f172a", borderRadius: 10, marginTop: 18, paddingVertical: 14 },
-  clearButtonText: { color: "#fff", fontSize: 14, fontWeight: "900" },
-  emptyCard: { borderRadius: 18, borderWidth: 1, padding: 20 },
+  clearButton: { alignItems: "center", borderRadius: 14, borderWidth: 1, marginTop: 18, paddingVertical: 14 },
+  clearButtonText: { fontSize: 14, fontWeight: "900" },
+  emptyCard: { borderRadius: 20, borderWidth: 1, padding: 20 },
   emptyTitle: { fontSize: 20, fontWeight: "900", marginBottom: 10 },
   emptyText: { fontSize: 13, lineHeight: 19 },
 });

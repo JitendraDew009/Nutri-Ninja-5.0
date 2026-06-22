@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { SymbolView } from "expo-symbols";
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   FirebaseSession,
@@ -107,10 +108,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 function LoadingScreen() {
   const { palette } = useThemeMode();
   return (
-    <View style={[styles.center, { backgroundColor: palette.background }]}>
+    <SafeAreaView style={[styles.center, { backgroundColor: palette.background }]} edges={["top", "bottom"]}>
       <ActivityIndicator size="large" color={palette.accentBright} />
       <Text style={[styles.loadingText, { color: palette.muted }]}>Loading your cloud profile...</Text>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -143,7 +144,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (session: FirebaseSe
   };
 
   return (
-    <View style={[styles.authPage, { backgroundColor: palette.background }]}>
+    <SafeAreaView style={[styles.authPage, { backgroundColor: palette.background }]} edges={["top", "bottom"]}>
       <View style={[styles.authCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         <View style={[styles.logo, { backgroundColor: palette.surfaceSoft }]}>
           <SymbolView name={{ ios: "leaf.fill", android: "eco", web: "eco" }} tintColor={palette.accentBright} size={38} />
@@ -178,9 +179,13 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (session: FirebaseSe
           placeholderTextColor={palette.muted}
           secureTextEntry
         />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
         <TouchableOpacity style={[styles.primary, { backgroundColor: palette.accentBright }]} onPress={submit} disabled={loading}>
-          {loading ? <ActivityIndicator color="#06120c" /> : <Text style={styles.primaryText}>{signup ? "Create account" : "Sign in"}</Text>}
+          {loading ? (
+            <ActivityIndicator color={palette.onAccent} />
+          ) : (
+            <Text style={[styles.primaryText, { color: palette.onAccent }]}>{signup ? "Create account" : "Sign in"}</Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setSignup((value) => !value)}>
           <Text style={[styles.switchText, { color: palette.accentBright }]}>
@@ -188,7 +193,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (session: FirebaseSe
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -198,11 +203,11 @@ const styles = StyleSheet.create({
   authPage: { alignItems: "center", flex: 1, justifyContent: "center", padding: 20 },
   authCard: { borderRadius: 26, borderWidth: 1, maxWidth: 430, padding: 28, width: "100%" },
   logo: { alignItems: "center", borderRadius: 24, height: 64, justifyContent: "center", marginBottom: 20, width: 64 },
-  title: { fontSize: 27, fontWeight: "900" },
+  title: { fontSize: 24, fontWeight: "900" },
   subtitle: { fontSize: 13, lineHeight: 20, marginBottom: 22, marginTop: 7 },
   input: { borderRadius: 14, borderWidth: 1, fontSize: 14, height: 50, marginBottom: 12, paddingHorizontal: 15 },
-  error: { color: "#ef4650", fontSize: 12, lineHeight: 17, marginBottom: 10 },
-  primary: { alignItems: "center", borderRadius: 15, justifyContent: "center", marginTop: 4, minHeight: 50 },
-  primaryText: { color: "#06120c", fontSize: 14, fontWeight: "900" },
+  error: { fontSize: 12, lineHeight: 17, marginBottom: 10 },
+  primary: { alignItems: "center", borderRadius: 16, justifyContent: "center", marginTop: 4, minHeight: 50 },
+  primaryText: { fontSize: 14, fontWeight: "900" },
   switchText: { fontSize: 13, fontWeight: "800", marginTop: 18, textAlign: "center" },
 });

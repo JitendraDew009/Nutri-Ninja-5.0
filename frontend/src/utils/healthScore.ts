@@ -85,6 +85,17 @@ export function getNutriScore(product: any): string {
 }
 
 /**
+ * Official Nutri-Score bar colors (A–E)
+ */
+export const nutriGradeBarColors: Record<string, string> = {
+  A: "#16b88b",
+  B: "#7ac70c",
+  C: "#d3a72c",
+  D: "#e8732f",
+  E: "#ef4650",
+};
+
+/**
  * Get color for health score
  */
 export function getHealthScoreColor(score: number): string {

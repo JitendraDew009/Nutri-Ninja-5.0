@@ -10,24 +10,28 @@ export const palettes = {
     background: "#f4f7fb",
     surface: "#ffffff",
     surfaceSoft: "#edf2f8",
+    surfaceInset: "#e8eef6",
     text: "#10172f",
     muted: "#64718a",
     border: "#d9e1ec",
     header: "#10172f",
     accent: "#22b86f",
     accentBright: "#49df88",
+    onAccent: "#06120c",
     danger: "#ef4650",
   },
   dark: {
     background: "#050817",
     surface: "#10172f",
     surfaceSoft: "#202b52",
+    surfaceInset: "#0b1127",
     text: "#f8fafc",
     muted: "#9ca7be",
     border: "#2c395f",
     header: "#102f38",
     accent: "#22b86f",
     accentBright: "#49df88",
+    onAccent: "#06120c",
     danger: "#ef4650",
   },
 };
@@ -80,8 +84,8 @@ export function ThemeToggle() {
       style={[
         styles.toggle,
         {
-          backgroundColor: mode === "day" ? "#ffffff" : "#111827",
-          borderColor: mode === "day" ? "#d1d5db" : "#334155",
+          backgroundColor: palette.surface,
+          borderColor: palette.border,
         },
       ]}
       onPress={toggleMode}
@@ -95,7 +99,7 @@ export function ThemeToggle() {
 
 const styles = StyleSheet.create({
   toggle: {
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 8,

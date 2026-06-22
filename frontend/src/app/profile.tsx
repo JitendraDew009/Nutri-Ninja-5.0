@@ -155,7 +155,7 @@ export default function ProfileScreen() {
               </Text>
               {profile.id === activeId ? (
                 <View style={[styles.activePill, { backgroundColor: palette.accentBright }]}>
-                  <Text style={styles.activePillText}>Active</Text>
+                  <Text style={[styles.activePillText, { color: palette.onAccent }]}>Active</Text>
                 </View>
               ) : null}
             </TouchableOpacity>
@@ -210,7 +210,7 @@ export default function ProfileScreen() {
                 ]}
                 onPress={() => setDraft({ ...draft, relationship: item.key })}
               >
-                <Text style={[styles.chipText, { color: draft.relationship === item.key ? "#071007" : palette.text }]}>
+                <Text style={[styles.chipText, { color: draft.relationship === item.key ? palette.onAccent : palette.text }]}>
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -254,7 +254,7 @@ export default function ProfileScreen() {
                 ]}
                 onPress={() => setDraft({ ...draft, goal: goal.key })}
               >
-                <Text style={[styles.chipText, { color: draft.goal === goal.key ? "#071007" : palette.text }]}>
+                <Text style={[styles.chipText, { color: draft.goal === goal.key ? palette.onAccent : palette.text }]}>
                   {goal.label}
                 </Text>
               </TouchableOpacity>
@@ -275,7 +275,7 @@ export default function ProfileScreen() {
                   ]}
                   onPress={() => toggleRestriction(restriction)}
                 >
-                  <Text style={[styles.chipText, { color: selected ? "#071007" : palette.text }]}>{restriction}</Text>
+                  <Text style={[styles.chipText, { color: selected ? palette.onAccent : palette.text }]}>{restriction}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -306,8 +306,8 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity style={[styles.saveButton, { backgroundColor: palette.accentBright }]} onPress={saveProfile}>
-              <SymbolView name={{ ios: "checkmark", android: "check", web: "check" }} tintColor="#071007" size={20} />
-              <Text style={styles.saveText}>Save and activate</Text>
+              <SymbolView name={{ ios: "checkmark", android: "check", web: "check" }} tintColor={palette.onAccent} size={20} />
+              <Text style={[styles.saveText, { color: palette.onAccent }]}>Save and activate</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 36 },
   header: { alignItems: "flex-start", flexDirection: "row", gap: 12, marginBottom: 18 },
   headerCopy: { flex: 1 },
-  pageTitle: { fontSize: 27, fontWeight: "900" },
+  pageTitle: { fontSize: 24, fontWeight: "900" },
   pageSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 5 },
   accountCard: { alignItems: "center", borderRadius: 18, borderWidth: 1, flexDirection: "row", gap: 12, marginBottom: 18, padding: 14 },
   accountIcon: { alignItems: "center", borderRadius: 16, height: 44, justifyContent: "center", width: 44 },
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 14, fontWeight: "900" },
   profileRelation: { fontSize: 11, marginTop: 3 },
   activePill: { alignSelf: "flex-start", borderRadius: 99, marginTop: 10, paddingHorizontal: 8, paddingVertical: 4 },
-  activePillText: { color: "#071007", fontSize: 10, fontWeight: "900" },
+  activePillText: { fontSize: 10, fontWeight: "900" },
   addCard: { alignItems: "center", borderRadius: 18, borderStyle: "dashed", borderWidth: 1, justifyContent: "center", minHeight: 142, width: 122 },
   addText: { fontSize: 12, fontWeight: "800", marginTop: 9 },
   formCard: { borderRadius: 22, borderWidth: 1, padding: 18 },
@@ -355,5 +355,5 @@ const styles = StyleSheet.create({
   deleteButton: { alignItems: "center", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 7, paddingHorizontal: 16, paddingVertical: 13 },
   deleteText: { fontSize: 13, fontWeight: "900" },
   saveButton: { alignItems: "center", borderRadius: 14, flexDirection: "row", gap: 7, justifyContent: "center", paddingHorizontal: 18, paddingVertical: 13 },
-  saveText: { color: "#071007", fontSize: 13, fontWeight: "900" },
+  saveText: { fontSize: 13, fontWeight: "900" },
 });

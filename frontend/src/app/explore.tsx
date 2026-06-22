@@ -25,12 +25,12 @@ const welcome: ChatMessage[] = [
 ];
 
 export default function ExploreScreen() {
-  const { mode, palette } = useThemeMode();
+  const { palette } = useThemeMode();
   const [messages, setMessages] = useState<ChatMessage[]>(welcome);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  const [voiceReplies, setVoiceReplies] = useState(true);
+  const [voiceReplies, setVoiceReplies] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -209,7 +209,7 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: palette.background }]}
-      edges={["top"]}
+      edges={["top", "bottom"]}
     >
       <View style={styles.header}>
         <View>
@@ -256,7 +256,7 @@ export default function ExploreScreen() {
                 },
               ]}
             >
-              <Text style={[styles.message, { color: assistant ? palette.text : "#08110a" }]}>
+              <Text style={[styles.message, { color: assistant ? palette.text : palette.onAccent }]}>
                 {message.content}
               </Text>
             </View>
@@ -274,7 +274,7 @@ export default function ExploreScreen() {
         <TouchableOpacity
           style={[
             styles.micButton,
-            { backgroundColor: listening ? "#ef4444" : palette.surfaceSoft },
+            { backgroundColor: listening ? palette.danger : palette.surfaceSoft },
           ]}
           onPress={startVoiceChat}
           disabled={loading}
@@ -298,7 +298,7 @@ export default function ExploreScreen() {
           onChangeText={setDraft}
           onSubmitEditing={() => submitMessage()}
           placeholder={listening ? "Recording... tap mic to send" : "Ask about nutrition or food"}
-          placeholderTextColor={mode === "day" ? "#7b8794" : "#8c9bb3"}
+          placeholderTextColor={palette.muted}
           returnKeyType="send"
           editable={!loading}
         />
@@ -309,7 +309,7 @@ export default function ExploreScreen() {
         >
           <SymbolView
             name={{ ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" }}
-            tintColor="#071007"
+            tintColor={palette.onAccent}
             size={23}
           />
         </TouchableOpacity>

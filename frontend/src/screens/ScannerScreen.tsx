@@ -261,7 +261,7 @@ export default function ScannerScreen() {
             <TextInput
               style={[styles.searchInput, { color: palette.text }]}
               placeholder="Search by product or brand"
-              placeholderTextColor="#7b8794"
+              placeholderTextColor={palette.muted}
               value={searchText}
               onChangeText={handleSearch}
               onSubmitEditing={() => handleSearch(searchText)}
@@ -288,11 +288,15 @@ export default function ScannerScreen() {
               ) : null}
 
               {suggestions.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.suggestionItem} onPress={() => handleSelectSuggestion(item)}>
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.suggestionItem, { borderBottomColor: palette.border }]}
+                  onPress={() => handleSelectSuggestion(item)}
+                >
                   <ProductImage
                     urls={item.imageUrls}
-                    style={styles.suggestionImage}
-                    placeholderStyle={styles.emptyImage}
+                    style={[styles.suggestionImage, { backgroundColor: palette.surfaceSoft }]}
+                    placeholderStyle={[styles.emptyImage, { backgroundColor: palette.surfaceSoft }]}
                   />
                   <View style={styles.suggestionTextWrap}>
                     <Text style={[styles.suggestionName, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
@@ -326,7 +330,7 @@ export default function ScannerScreen() {
                 ratio="16:9"
               />
               <View style={styles.cameraShade}>
-                <View style={styles.scanLine} />
+                <View style={[styles.scanLine, { backgroundColor: palette.accentBright }]} />
               </View>
             </View>
           ) : (
@@ -343,7 +347,7 @@ export default function ScannerScreen() {
             ]}
             onPress={handleOpenLens}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text style={[styles.primaryButtonText, { color: palette.onAccent }]}>
               Open Lens
             </Text>
           </TouchableOpacity>
@@ -353,19 +357,19 @@ export default function ScannerScreen() {
           <Text style={[styles.featureTitle, { color: palette.text }]}>Pulsing Barcode Terminal</Text>
           <Text style={[styles.featureSubtitle, { color: palette.muted }]}>Enter a barcode manually or scan from a label.</Text>
           <View style={[styles.barcodeDisplay, { borderColor: palette.border }]}> 
-            <BarcodeBars />
+            <BarcodeBars color={palette.text} />
           </View>
           <TextInput
             style={[styles.manualInput, { backgroundColor: palette.surfaceSoft, borderColor: palette.border, color: palette.text }]}
             placeholder="Enter barcode manually"
-            placeholderTextColor="#7b8794"
+            placeholderTextColor={palette.muted}
             keyboardType="numeric"
             value={barcodeText}
             onChangeText={setBarcodeText}
             onSubmitEditing={() => openProductByBarcode(barcodeText)}
           />
           <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: palette.accentBright }]} onPress={() => openProductByBarcode(barcodeText)}>
-            <Text style={styles.secondaryButtonText}>Lookup Barcode</Text>
+            <Text style={[styles.secondaryButtonText, { color: palette.onAccent }]}>Lookup Barcode</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -373,24 +377,24 @@ export default function ScannerScreen() {
   );
 }
 
-function BarcodeBars() {
+function BarcodeBars({ color }: { color: string }) {
   const widths = [2, 5, 1, 4, 3, 1, 6, 2, 4, 1, 5, 2, 3, 6, 1, 4, 2, 5, 1, 3, 6, 2, 4];
   return (
     <View style={styles.barcodeBars}>
       {widths.map((width, index) => (
-        <View key={`${width}-${index}`} style={[styles.barcodeBar, { width }]} />
+        <View key={`${width}-${index}`} style={[styles.barcodeBar, { width, backgroundColor: color }]} />
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f6faf4" },
+  container: { flex: 1 },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 30 },
   headerPanel: { marginBottom: 22 },
-  pageTitle: { fontSize: 26, fontWeight: "900", marginBottom: 8 },
-  pageSubtitle: { fontSize: 14, lineHeight: 20 },
+  pageTitle: { fontSize: 24, fontWeight: "900", marginBottom: 8 },
+  pageSubtitle: { fontSize: 13, lineHeight: 20 },
   profileHeader: {
     alignItems: "center",
     borderRadius: 20,
@@ -439,22 +443,22 @@ const styles = StyleSheet.create({
   featureTitle: { fontSize: 17, fontWeight: "900", marginBottom: 4 },
   featureSubtitle: { fontSize: 13, lineHeight: 20 },
   primaryButton: { alignItems: "center", borderRadius: 16, paddingVertical: 14, marginTop: 6 },
-  primaryButtonText: { color: "#fff", fontSize: 15, fontWeight: "900" },
+  primaryButtonText: { fontSize: 15, fontWeight: "900" },
   barcodeDisplay: { alignItems: "center", borderRadius: 16, borderWidth: 1, marginVertical: 16, padding: 14 },
   secondaryButton: { alignItems: "center", borderRadius: 16, paddingVertical: 14, marginTop: 6 },
-  secondaryButtonText: { color: "#fff", fontSize: 15, fontWeight: "900" },
+  secondaryButtonText: { fontSize: 15, fontWeight: "900" },
   suggestionsCard: { borderRadius: 20, borderWidth: 1, marginTop: 6, marginBottom: 16, padding: 14, maxHeight: 320, overflow: "hidden" },
   suggestionList: { maxHeight: 280 },
   suggestionsHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   suggestionsTitle: { fontSize: 15, fontWeight: "900", marginBottom: 0 },
   inlineLoading: { alignItems: "center", flexDirection: "row" },
   noResultsText: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
-  suggestionItem: { alignItems: "center", borderBottomColor: "#e5e7eb", borderBottomWidth: 1, flexDirection: "row", gap: 10, paddingVertical: 12 },
-  suggestionImage: { backgroundColor: "#e5e7eb", borderRadius: 6, height: 44, width: 44 },
-  emptyImage: { backgroundColor: "#e5e7eb", borderRadius: 6, height: 44, width: 44 },
+  suggestionItem: { alignItems: "center", borderBottomWidth: 1, flexDirection: "row", gap: 10, paddingVertical: 12 },
+  suggestionImage: { borderRadius: 12, height: 44, width: 44 },
+  emptyImage: { borderRadius: 12, height: 44, width: 44 },
   suggestionTextWrap: { flex: 1 },
-  suggestionName: { color: "#111827", fontSize: 13, fontWeight: "700" },
-  suggestionBrand: { color: "#64748b", fontSize: 11, marginTop: 2 },
+  suggestionName: { fontSize: 13, fontWeight: "700" },
+  suggestionBrand: { fontSize: 11, marginTop: 2 },
   scoreBadge: {
     alignItems: "center",
     borderRadius: 12,
@@ -505,9 +509,8 @@ const styles = StyleSheet.create({
     height: 70,
     justifyContent: "center",
   },
-  barcodeBar: { backgroundColor: "#0f172a", height: 66 },
+  barcodeBar: { height: 66 },
   scanLine: {
-    backgroundColor: "#22c55e",
     height: 3,
     left: 0,
     position: "absolute",
@@ -557,13 +560,11 @@ const styles = StyleSheet.create({
   divider: { backgroundColor: "#d1d5db", flex: 1, height: 1 },
   orText: { color: "#111827", fontSize: 12 },
   manualInput: {
-    borderColor: "#d1d5db",
-    borderRadius: 6,
+    borderRadius: 14,
     borderWidth: 1,
-    color: "#111827",
-    fontSize: 13,
-    height: 44,
-    paddingHorizontal: 12,
+    fontSize: 14,
+    height: 46,
+    paddingHorizontal: 14,
   },
   searchButton: {
     alignItems: "center",
