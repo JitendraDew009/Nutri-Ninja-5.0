@@ -13,7 +13,7 @@ import {
   signOutFirebase,
   signUpWithEmail,
 } from "../services/firebaseRest";
-import { getFamilyProfiles, readStore, writeStore } from "../utils/localStore";
+import { addNativeListener, canUseBrowserEvents, emitStoreEvent, getFamilyProfiles, readStore, writeStore } from "../utils/localStore";
 import { useThemeMode } from "../utils/themeMode";
 
 type AuthContextValue = {
@@ -52,9 +52,7 @@ function restoreSnapshot(data: any) {
     writeStore(`scanHistory:${profileId}`, value?.history || []);
     writeStore(`groceryBasket:${profileId}`, value?.basket || []);
   });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("nutri-profile-changed"));
-  }
+  emitStoreEvent("nutri-profile-changed");
 }
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -77,15 +75,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!session || typeof window === "undefined") return;
+    if (!session) return;
     const sync = () => {
       if (syncTimer.current) clearTimeout(syncTimer.current);
       syncTimer.current = setTimeout(() => {
         saveUserCloudData(session, cloudSnapshot()).then(setSession).catch(() => undefined);
       }, 900);
     };
-    window.addEventListener("nutri-data-changed", sync);
-    return () => window.removeEventListener("nutri-data-changed", sync);
+    if (canUseBrowserEvents()) {
+      window.addEventListener("nutri-data-changed", sync);
+      return () => window.removeEventListener("nutri-data-changed", sync);
+    }
+    return addNativeListener("nutri-data-changed", sync);
   }, [session]);
 
   const value = useMemo(

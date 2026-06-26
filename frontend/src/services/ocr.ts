@@ -1,8 +1,10 @@
 /**
- * OCR service for extracting text from food package images
+ * OCR service for extracting text from food package images.
+ * Tesseract is loaded only on web because tesseract.js workers are not
+ * compatible with Expo Go / native Android without a native OCR module.
  */
 
-import Tesseract from 'tesseract.js';
+import { Platform } from 'react-native';
 
 export interface OCRResult {
   text: string;
@@ -10,13 +12,18 @@ export interface OCRResult {
   error?: string;
 }
 
-let workerInstance: Tesseract.Worker | null = null;
+let workerInstance: any | null = null;
 
 /**
  * Get or create a Tesseract worker instance
  */
-async function getWorker(): Promise<Tesseract.Worker> {
+async function getWorker(): Promise<any> {
+  if (Platform.OS !== 'web') {
+    throw new Error('OCR image extraction is available in the web app. On Android, paste label text manually or add a native OCR module before release.');
+  }
+
   if (!workerInstance) {
+    const Tesseract = await import('tesseract.js');
     workerInstance = await Tesseract.createWorker();
   }
   return workerInstance;

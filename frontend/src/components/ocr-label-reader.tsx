@@ -38,7 +38,7 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
   const [healthAssessment, setHealthAssessment] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiAnswer, setAiAnswer] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<any>(null);
 
   const handleImageUpload = async (file: File) => {
     setOcrLoading(true);
@@ -206,7 +206,10 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
 
             <TouchableOpacity
               style={[styles.button, { backgroundColor: palette.accentBright, opacity: 0.8 }]}
-              onPress={() => fileInputRef.current?.click()}
+              onPress={() => {
+                if (Platform.OS === 'web') fileInputRef.current?.click();
+                else alert('Image upload OCR is currently available in the web app. You can paste label text manually here.');
+              }}
               disabled={ocrLoading}
             >
               <View style={styles.buttonContent}>
@@ -215,13 +218,15 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
               </View>
             </TouchableOpacity>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-            />
+            {Platform.OS === 'web' ? (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
+            ) : null}
 
             {ocrLoading ? (
               <Text style={[styles.progressText, { color: palette.muted }]}>

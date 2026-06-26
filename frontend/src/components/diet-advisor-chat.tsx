@@ -156,7 +156,7 @@ export default function DietAdvisorChat({
         >
           {!messages.length && !loading ? (
             <Text style={[styles.emptyText, { color: palette.muted }]}>
-              No doubts yet. Ask, e.g., &apos;Is the sweetener used here safe for weight loss?&apos;
+              No doubts yet. Ask, e.g., "Is the sweetener used here safe for weight loss?"
             </Text>
           ) : (
             messages.map((message, index) => {

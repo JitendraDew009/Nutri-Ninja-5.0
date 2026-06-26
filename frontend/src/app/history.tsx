@@ -8,7 +8,9 @@ import { fetchProduct, searchProducts } from "../services/api";
 import { getHealthScore, getHealthScoreColor } from "../utils/healthScore";
 import {
   UserProfile,
+  addNativeListener,
   getActiveProfile,
+  canUseBrowserEvents,
   getFamilyProfiles,
   productSummary,
   profileStoreKey,
@@ -38,10 +40,11 @@ export default function HistoryScreen() {
     };
 
     refreshProfile();
-    if (typeof window !== "undefined") {
+    if (canUseBrowserEvents()) {
       window.addEventListener("nutri-profile-changed", refreshProfile);
       return () => window.removeEventListener("nutri-profile-changed", refreshProfile);
     }
+    return addNativeListener("nutri-profile-changed", refreshProfile);
   }, []);
 
   const totalScans = history.length;
@@ -199,7 +202,7 @@ export default function HistoryScreen() {
                   <Text style={[styles.scanBrand, { color: palette.muted }]} numberOfLines={1}>{product.brands || "Open Food Facts"}</Text>
                 </View>
                 <View style={[styles.scoreRingSmall, { borderColor: getHealthScoreColor(getHealthScore(product)) }]}>
-                  <Text style={styles.gradeText}>{getHealthScore(product)}</Text>
+                  <Text style={[styles.gradeText, { color: getHealthScoreColor(getHealthScore(product)) }]}>{getHealthScore(product)}</Text>
                 </View>
                 <TouchableOpacity
                   onPress={(event) => {

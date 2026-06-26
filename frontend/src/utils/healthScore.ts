@@ -137,57 +137,72 @@ export function getHealthScoreLabel(score: number): string {
   return "Very Poor";
 }
 
+function textContains(text: unknown, term: unknown) {
+  const source = String(text || "").toLowerCase();
+  const needle = String(term || "").toLowerCase().trim();
+  return Boolean(source && needle && source.indexOf(needle) >= 0);
+}
+
+function commaList(value: unknown) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function getPersonalizedInsights(product: any, profile?: any): string[] {
-  const n = product?.nutriments || {};
-  const goal = profile?.goal || "general";
-  const insights: string[] = [];
+  try {
+    const n = product?.nutriments || {};
+    const goal = profile?.goal || "general";
+    const insights: string[] = [];
 
-  if (goal === "diabetes" && (n.sugars_100g || 0) > 10) {
-    insights.push("Diabetes alert: sugar is high for regular intake.");
-  }
+    if (goal === "diabetes" && (n.sugars_100g || 0) > 10) {
+      insights.push("Diabetes alert: sugar is high for regular intake.");
+    }
 
-  if (goal === "weight_loss" && (n.energy_100g || 0) > 350) {
-    insights.push("Weight loss mode: calorie density is high, keep portion size small.");
-  }
+    if (goal === "weight_loss" && (n.energy_100g || 0) > 350) {
+      insights.push("Weight loss mode: calorie density is high, keep portion size small.");
+    }
 
-  if (goal === "muscle_gain" && (n.proteins_100g || 0) >= 8) {
-    insights.push("Muscle gain mode: this product contributes useful protein.");
-  }
+    if (goal === "muscle_gain" && (n.proteins_100g || 0) >= 8) {
+      insights.push("Muscle gain mode: this product contributes useful protein.");
+    }
 
-  if (goal === "heart_health" && ((n.salt_100g || 0) > 0.75 || (n["saturated-fat_100g"] || 0) > 3)) {
-    insights.push("Heart health alert: sodium or saturated fat deserves caution.");
-  }
+    if (goal === "heart_health" && ((n.salt_100g || 0) > 0.75 || (n["saturated-fat_100g"] || 0) > 3)) {
+      insights.push("Heart health alert: sodium or saturated fat deserves caution.");
+    }
 
-  const allergies = String(profile?.allergies || "").toLowerCase();
-  const ingredients = String(product?.ingredients_text || "").toLowerCase();
-  if (allergies && ingredients) {
-    allergies
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .forEach((allergy) => {
-        if (ingredients.includes(allergy)) {
+    const allergies = String(profile?.allergies || "").toLowerCase();
+    const ingredients = String(
+      product?.ingredients_text ||
+        product?.ingredients_text_en ||
+        (Array.isArray(product?.ingredients)
+          ? product.ingredients.map((item: any) => item?.text || item).join(", ")
+          : "")
+    ).toLowerCase();
+    if (allergies && ingredients) {
+      commaList(allergies).forEach((allergy) => {
+        if (textContains(ingredients, allergy)) {
           insights.push(`Allergy alert: ingredients mention ${allergy}.`);
         }
       });
-  }
+    }
 
-  const avoided = String(profile?.dislikedIngredients || "").toLowerCase();
-  if (avoided && ingredients) {
-    avoided
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .forEach((ingredient) => {
-        if (ingredients.includes(ingredient)) {
+    const avoided = String(profile?.dislikedIngredients || "").toLowerCase();
+    if (avoided && ingredients) {
+      commaList(avoided).forEach((ingredient) => {
+        if (textContains(ingredients, ingredient)) {
           insights.push(`Preference alert: this product contains ${ingredient}, which is on your avoid list.`);
         }
       });
-  }
+    }
 
-  if (insights.length === 0) {
-    insights.push("No major profile-specific issues detected from available label data.");
-  }
+    if (insights.length === 0) {
+      insights.push("No major profile-specific issues detected from available label data.");
+    }
 
-  return insights;
+    return insights;
+  } catch {
+    return ["Personalized insight is unavailable for this product because some label data is incomplete."];
+  }
 }

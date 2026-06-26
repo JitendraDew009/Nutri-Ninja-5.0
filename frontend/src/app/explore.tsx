@@ -47,7 +47,8 @@ export default function ExploreScreen() {
   const [listening, setListening] = useState(false);
   const [voiceReplies, setVoiceReplies] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState("");
-  const [voiceMode, setVoiceMode] = useState<"idle" | "live" | "recording">("idle");
+  const [voiceMode, setVoiceMode] = useState<"idle" | "live" | "recording" | "speaking">("idle");
+  const [liveConversation, setLiveConversation] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -55,6 +56,9 @@ export default function ExploreScreen() {
   const chunksRef = useRef<Blob[]>([]);
   const transcriptRef = useRef("");
   const voiceRepliesRef = useRef(false);
+  const liveConversationRef = useRef(false);
+  const messagesRef = useRef<ChatMessage[]>(welcome);
+  const stopRequestedRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -65,14 +69,57 @@ export default function ExploreScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   const setSpokenReplies = (enabled: boolean) => {
     voiceRepliesRef.current = enabled;
     setVoiceReplies(enabled);
     if (!enabled) cancelSpeech();
   };
 
-  const speak = (text: string) => {
-    speakAutoLanguage(text, { enabled: voiceRepliesRef.current });
+  const stopLiveConversation = () => {
+    stopRequestedRef.current = true;
+    liveConversationRef.current = false;
+    setLiveConversation(false);
+    setListening(false);
+    setVoiceMode("idle");
+    setLiveTranscript("");
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    cancelSpeech();
+  };
+
+  const speak = (text: string, continueListening = false) => {
+    if (voiceRepliesRef.current) {
+      setVoiceMode("speaking");
+      setLiveTranscript("Speaking answer...");
+    }
+
+    speakAutoLanguage(text, {
+      enabled: voiceRepliesRef.current,
+      onEnd: () => {
+        if (continueListening && liveConversationRef.current) {
+          setLiveTranscript("Tap mic to stop. Listening again...");
+          setTimeout(() => {
+            if (liveConversationRef.current && !recognitionRef.current) {
+              startSpeechRecognition(true);
+            }
+          }, 350);
+          return;
+        }
+
+        if (!liveConversationRef.current) {
+          setVoiceMode("idle");
+          setLiveTranscript("");
+        }
+      },
+    });
   };
 
   const toggleVoiceReplies = () => {
@@ -84,14 +131,15 @@ export default function ExploreScreen() {
     });
   };
 
-  const submitMessage = async (text = draft) => {
+  const submitMessage = async (text = draft, options?: { fromLiveVoice?: boolean }) => {
     const content = text.trim();
     if (!content || loading) return;
 
     const nextMessages: ChatMessage[] = [
-      ...messages,
+      ...messagesRef.current,
       { role: "user", content },
     ];
+    messagesRef.current = nextMessages;
     setMessages(nextMessages);
     setDraft("");
     setLiveTranscript("");
@@ -101,19 +149,22 @@ export default function ExploreScreen() {
     try {
       const profile = getActiveProfile();
       const answer = await sendChatMessage(nextMessages, profile);
-      setMessages((current) => [
-        ...current,
+      const answeredMessages: ChatMessage[] = [
+        ...nextMessages,
         { role: "assistant", content: answer },
-      ]);
-      speak(answer);
+      ];
+      messagesRef.current = answeredMessages;
+      setMessages(answeredMessages);
+      speak(answer, options?.fromLiveVoice);
     } catch (error: any) {
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content: error?.message || "I couldn't answer just now. Please try again.",
-        },
-      ]);
+      const errorMessage = error?.message || "I couldn't answer just now. Please try again.";
+      const erroredMessages: ChatMessage[] = [
+        ...nextMessages,
+        { role: "assistant", content: errorMessage },
+      ];
+      messagesRef.current = erroredMessages;
+      setMessages(erroredMessages);
+      speak(errorMessage, options?.fromLiveVoice);
     } finally {
       setLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
@@ -150,7 +201,7 @@ export default function ExploreScreen() {
         ...current,
         { role: "assistant", content: answer },
       ]);
-      speak(answer);
+      speak(answer, liveConversationRef.current);
     } catch (error: any) {
       setMessages((current) => [
         ...current,
@@ -164,7 +215,7 @@ export default function ExploreScreen() {
     }
   };
 
-  const startSpeechRecognition = () => {
+  const startSpeechRecognition = (keepAlive = false) => {
     const SpeechRecognitionConstructor =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -186,7 +237,7 @@ export default function ExploreScreen() {
     recognition.onstart = () => {
       setVoiceMode("live");
       setListening(true);
-      setLiveTranscript("Listening...");
+      setLiveTranscript(keepAlive ? "Live talk is on. Listening..." : "Listening...");
     };
 
     recognition.onresult = (event: any) => {
@@ -211,6 +262,7 @@ export default function ExploreScreen() {
     };
 
     recognition.onerror = (event: any) => {
+      if (stopRequestedRef.current) return;
       setListening(false);
       setVoiceMode("idle");
       const error = event?.error;
@@ -221,6 +273,10 @@ export default function ExploreScreen() {
             ? "I could not hear clearly. Please tap the mic and speak again."
             : "Voice recognition could not start. Try again or type your question.";
       setMessages((current) => [...current, { role: "assistant", content: message }]);
+      if (error === "not-allowed") {
+        liveConversationRef.current = false;
+        setLiveConversation(false);
+      }
     };
 
     recognition.onend = () => {
@@ -228,12 +284,23 @@ export default function ExploreScreen() {
       setListening(false);
       setVoiceMode("idle");
 
+      if (stopRequestedRef.current) {
+        stopRequestedRef.current = false;
+        transcriptRef.current = "";
+        setDraft("");
+        setLiveTranscript("");
+        return;
+      }
+
       const content = (finalTranscript || transcriptRef.current).trim();
       if (content) {
-        setTimeout(() => submitMessage(content), 50);
+        setTimeout(() => submitMessage(content, { fromLiveVoice: keepAlive }), 50);
       } else {
         setLiveTranscript("");
         transcriptRef.current = "";
+        if (keepAlive && liveConversationRef.current) {
+          setTimeout(() => startSpeechRecognition(true), 450);
+        }
       }
     };
 
@@ -253,6 +320,11 @@ export default function ExploreScreen() {
       return;
     }
 
+    if (liveConversationRef.current) {
+      stopLiveConversation();
+      return;
+    }
+
     if (listening && recognitionRef.current) {
       recognitionRef.current.stop();
       return;
@@ -263,11 +335,17 @@ export default function ExploreScreen() {
       return;
     }
 
-    if (startSpeechRecognition()) {
+    stopRequestedRef.current = false;
+    liveConversationRef.current = true;
+    setLiveConversation(true);
+
+    if (startSpeechRecognition(true)) {
       return;
     }
 
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      liveConversationRef.current = false;
+      setLiveConversation(false);
       setMessages((current) => [
         ...current,
         {
@@ -281,6 +359,7 @@ export default function ExploreScreen() {
     try {
       cancelSpeech();
       setSpokenReplies(true);
+      setLiveTranscript("Recording audio... tap mic again to send.");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       chunksRef.current = [];
@@ -299,15 +378,18 @@ export default function ExploreScreen() {
         recorderRef.current = null;
         setListening(false);
         setVoiceMode("idle");
+        liveConversationRef.current = false;
+        setLiveConversation(false);
         submitVoiceMessage(blob);
       };
       recorder.start();
       setVoiceMode("recording");
       setListening(true);
-      setLiveTranscript("Recording audio... tap mic again to send.");
     } catch (error: any) {
       setListening(false);
       setVoiceMode("idle");
+      liveConversationRef.current = false;
+      setLiveConversation(false);
       const denied = error?.name === "NotAllowedError";
       setMessages((current) => [
         ...current,
@@ -330,7 +412,7 @@ export default function ExploreScreen() {
         <View>
           <Text style={[styles.title, { color: palette.text }]}>AI Nutrition Assistant</Text>
           <Text style={[styles.subtitle, { color: palette.muted }]}>
-            Tap mic and speak. I will listen, answer, and read it back.
+            Tap mic to start live talk. Tap again to stop.
           </Text>
         </View>
         <TouchableOpacity
@@ -387,7 +469,8 @@ export default function ExploreScreen() {
           <View style={[styles.liveStatus, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <View style={[styles.liveDot, { backgroundColor: listening ? palette.danger : palette.accentBright }]} />
             <Text style={[styles.liveStatusText, { color: palette.text }]}>
-              {voiceMode === "recording" ? "Recording: " : voiceMode === "live" ? "Listening: " : ""}
+              {liveConversation ? "Live talk on: " : ""}
+              {voiceMode === "recording" ? "Recording: " : voiceMode === "live" ? "Listening: " : voiceMode === "speaking" ? "Speaking: " : ""}
               {liveTranscript || "Ready for voice chat"}
             </Text>
           </View>
@@ -398,14 +481,14 @@ export default function ExploreScreen() {
         <TouchableOpacity
           style={[
             styles.micButton,
-            { backgroundColor: listening ? palette.danger : palette.surfaceSoft },
+            { backgroundColor: liveConversation || listening ? palette.danger : palette.surfaceSoft },
           ]}
           onPress={startVoiceChat}
           disabled={loading}
         >
           <SymbolView
             name={{ ios: "mic.fill", android: "mic", web: "mic" }}
-            tintColor={listening ? "#fff" : palette.accentBright}
+            tintColor={liveConversation || listening ? "#fff" : palette.accentBright}
             size={25}
           />
         </TouchableOpacity>
@@ -421,7 +504,7 @@ export default function ExploreScreen() {
           value={draft}
           onChangeText={setDraft}
           onSubmitEditing={() => submitMessage()}
-          placeholder={listening ? "Recording... tap mic to send" : "Ask about nutrition or food"}
+          placeholder={liveConversation ? "Live talk is on..." : listening ? "Recording... tap mic to send" : "Ask about nutrition or food"}
           placeholderTextColor={palette.muted}
           returnKeyType="send"
           editable={!loading}

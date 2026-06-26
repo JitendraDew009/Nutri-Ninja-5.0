@@ -19,22 +19,32 @@ function getBackendUrl() {
   const host = typeof hostUri === "string" ? hostUri.split(":")[0] : "";
   if (host) return `http://${host}:8000`;
 
-  if (Platform.OS === "android") return "http://10.0.2.2:8000";
+  const isDevelopment = process.env.NODE_ENV !== "production";
+  if (isDevelopment && Platform.OS === "android") return "http://10.0.2.2:8000";
+
+  // Production Android builds must use a deployed HTTPS backend.
+  // Do not silently point a release APK at localhost/emulator.
+  if (Platform.OS !== "web") return "";
+
   return "http://127.0.0.1:8000";
 }
 
 const BACKEND_URL = getBackendUrl();
+const BACKEND_REQUIRED_MESSAGE =
+  "Backend URL is not configured for this Android build. Set EXPO_PUBLIC_BACKEND_URL to your deployed FastAPI HTTPS URL before exporting the APK/AAB.";
 
 export async function fetchProduct(
   barcode: string
 ) {
   const backendUrl =
-    `${BACKEND_URL}/product/${barcode}`;
+    BACKEND_URL ? `${BACKEND_URL}/product/${barcode}` : "";
 
   const fallbackUrl =
     `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`;
 
   try {
+    if (!backendUrl) throw new Error("Backend not configured");
+
     const response =
       await axios.get(backendUrl, { timeout: 8000 });
 
@@ -49,6 +59,8 @@ export async function fetchProduct(
 
 export async function analyzeProduct(product: any, profile?: any) {
   try {
+    if (!BACKEND_URL) throw new Error("Backend not configured");
+
     const response = await axios.post(`${BACKEND_URL}/analyze`, {
       product,
       profile,
@@ -72,7 +84,7 @@ export async function searchProducts(
   }
 
   const backendUrl =
-    `${BACKEND_URL}/search?query=${encodeURIComponent(query)}&page_size=40`;
+    BACKEND_URL ? `${BACKEND_URL}/search?query=${encodeURIComponent(query)}&page_size=40` : "";
 
   const fallbackUrl =
     `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
@@ -80,6 +92,8 @@ export async function searchProducts(
     )}&search_simple=1&json=1&page_size=40`;
 
   try {
+    if (!backendUrl) throw new Error("Backend not configured");
+
     const response =
       await axios.get(backendUrl, { timeout: 8000 });
 
@@ -113,6 +127,8 @@ export type ChatMessage = {
 
 export async function sendChatMessage(messages: ChatMessage[], profile?: any) {
   try {
+    if (!BACKEND_URL) throw new Error(BACKEND_REQUIRED_MESSAGE);
+
     const response = await axios.post(
       `${BACKEND_URL}/chat`,
       { messages, profile },
@@ -124,6 +140,8 @@ export async function sendChatMessage(messages: ChatMessage[], profile?: any) {
     throw new Error(
       typeof detail === "string"
         ? detail
+        : error?.message === BACKEND_REQUIRED_MESSAGE
+          ? BACKEND_REQUIRED_MESSAGE
         : `Unable to reach the nutrition assistant at ${BACKEND_URL}. Check that the backend is running and your phone is on the same Wi-Fi.`
     );
   }
@@ -136,6 +154,8 @@ export async function sendVoiceMessage(
   profile?: any
 ) {
   try {
+    if (!BACKEND_URL) throw new Error(BACKEND_REQUIRED_MESSAGE);
+
     const response = await axios.post(
       `${BACKEND_URL}/chat/voice`,
       {
@@ -152,6 +172,8 @@ export async function sendVoiceMessage(
     throw new Error(
       typeof detail === "string"
         ? detail
+        : error?.message === BACKEND_REQUIRED_MESSAGE
+          ? BACKEND_REQUIRED_MESSAGE
         : `Unable to process the voice message at ${BACKEND_URL}. Check that the backend is running and your phone is on the same Wi-Fi.`
     );
   }

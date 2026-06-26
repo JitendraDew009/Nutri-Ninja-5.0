@@ -18,7 +18,7 @@ import OCRLabelReader from "../components/ocr-label-reader";
 import ProductImage from "../components/product-image";
 import { fetchProduct, searchProducts } from "../services/api";
 import { getHealthScore, getHealthScoreColor, getNutriScore, getNutriScoreColor } from "../utils/healthScore";
-import { getActiveProfile, productSummary, profileStoreKey, readStore, writeStore, UserProfile } from "../utils/localStore";
+import { addNativeListener, canUseBrowserEvents, getActiveProfile, productSummary, profileStoreKey, readStore, writeStore, UserProfile } from "../utils/localStore";
 import { useThemeMode } from "../utils/themeMode";
 import { getProductImageUrl, getProductImageUrls } from "../utils/productImage";
 
@@ -61,16 +61,12 @@ export default function ScannerScreen() {
   const latestSearchRef = useRef<string>("");
 
   useEffect(() => {
-    if (permission?.granted === false) {
-      requestPermission();
-    }
-
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [permission, requestPermission]);
+  }, []);
 
   const rememberProduct = (product: any) => {
     const summary = productSummary(product);
@@ -191,10 +187,11 @@ export default function ScannerScreen() {
       setBasket(readStore(profileStoreKey("groceryBasket", nextProfile.id), []));
     };
     refreshProfile();
-    if (typeof window !== "undefined") {
+    if (canUseBrowserEvents()) {
       window.addEventListener("nutri-profile-changed", refreshProfile);
       return () => window.removeEventListener("nutri-profile-changed", refreshProfile);
     }
+    return addNativeListener("nutri-profile-changed", refreshProfile);
   }, []);
 
   const closeProduct = () => {

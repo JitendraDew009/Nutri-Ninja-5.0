@@ -1,16 +1,22 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Nutri Ninja",
+    "slug": "nutri-ninja",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "nutrininja",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.nutrininja.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -25,6 +31,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Nutri Ninja to use the camera to scan food barcodes and labels."
+        }
+      ],
       [
         "expo-splash-screen",
         {

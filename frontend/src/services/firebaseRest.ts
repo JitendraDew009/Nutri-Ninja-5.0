@@ -1,4 +1,5 @@
 import axios from "axios";
+import { deleteStore, readStore, writeStore } from "../utils/localStore";
 
 export type FirebaseSession = {
   idToken: string;
@@ -16,17 +17,8 @@ const AUTH_BASE = "https://identitytoolkit.googleapis.com/v1/accounts";
 
 export const firebaseConfigured = Boolean(apiKey && projectId);
 
-function storage() {
-  return typeof window !== "undefined" ? window.localStorage : null;
-}
-
 export function getFirebaseSession(): FirebaseSession | null {
-  try {
-    const raw = storage()?.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return readStore<FirebaseSession | null>(SESSION_KEY, null);
 }
 
 function saveSession(data: any): FirebaseSession {
@@ -38,7 +30,7 @@ function saveSession(data: any): FirebaseSession {
     displayName: data.displayName || "",
     expiresAt: Date.now() + Number(data.expiresIn || 3600) * 1000,
   };
-  storage()?.setItem(SESSION_KEY, JSON.stringify(session));
+  writeStore(SESSION_KEY, session);
   return session;
 }
 
@@ -51,7 +43,7 @@ function authError(error: any) {
     TOO_MANY_ATTEMPTS_TRY_LATER: "Too many attempts. Please try again later.",
     USER_DISABLED: "This account has been disabled.",
   };
-  return new Error(messages[code] || code.replaceAll("_", " ").toLowerCase() || "Authentication failed.");
+  return new Error(messages[code] || code.replace(/_/g, " ").toLowerCase() || "Authentication failed.");
 }
 
 export async function signUpWithEmail(name: string, email: string, password: string) {
@@ -89,7 +81,7 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 export function signOutFirebase() {
-  storage()?.removeItem(SESSION_KEY);
+  deleteStore(SESSION_KEY);
 }
 
 export async function refreshFirebaseSession(session: FirebaseSession) {
