@@ -313,7 +313,7 @@ def generate_gemini(contents: list[dict[str, Any]], profile: dict[str, Any] | No
 
     try:
         response = None
-        for attempt in range(2):
+        for attempt in range(3):
             response = requests.post(
                 f"{GEMINI_API_BASE}/{GEMINI_MODEL}:generateContent",
                 headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
@@ -325,14 +325,15 @@ def generate_gemini(contents: list[dict[str, Any]], profile: dict[str, Any] | No
 
             error_data = response.json()
             delay = retry_delay_seconds(error_data)
-            if attempt == 0 and delay is not None and delay <= 12:
+            # Auto-retry for short waits (up to 15 seconds)
+            if attempt < 2 and delay is not None and delay <= 15:
                 time.sleep(delay + 0.5)
                 continue
 
-            wait_seconds = max(1, round(delay or 60))
+            wait_seconds = max(1, round(delay or 30))
             raise HTTPException(
                 status_code=429,
-                detail=f"Gemini's free tier is temporarily busy. Please try again in about {wait_seconds} seconds.",
+                detail=f"AI is busy right now. Please wait {wait_seconds} seconds and try again.",
             )
 
         assert response is not None
