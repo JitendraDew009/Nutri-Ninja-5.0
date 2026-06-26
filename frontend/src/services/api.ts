@@ -22,8 +22,6 @@ function getBackendUrl() {
   const isDevelopment = process.env.NODE_ENV !== "production";
   if (isDevelopment && Platform.OS === "android") return "http://10.0.2.2:8000";
 
-  // Production Android builds must use a deployed HTTPS backend.
-  // Do not silently point a release APK at localhost/emulator.
   if (Platform.OS !== "web") return "";
 
   return "http://127.0.0.1:8000";
@@ -33,26 +31,28 @@ const BACKEND_URL = getBackendUrl();
 const BACKEND_REQUIRED_MESSAGE =
   "Backend URL is not configured for this Android build. Set EXPO_PUBLIC_BACKEND_URL to your deployed FastAPI HTTPS URL before exporting the APK/AAB.";
 
-export async function fetchProduct(
-  barcode: string
-) {
-  const backendUrl =
-    BACKEND_URL ? `${BACKEND_URL}/product/${barcode}` : "";
+const OFF_BASE = "https://world.openfoodfacts.org";
 
-  const fallbackUrl =
-    `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`;
+// Race backend against OpenFoodFacts directly — whichever replies first wins.
+// This eliminates the cold-start wait on Render free tier.
+async function raceGet(backendUrl: string, offUrl: string): Promise<any> {
+  const backendReq = axios.get(backendUrl, { timeout: 6000 }).then((r) => r.data);
+  const offReq = axios.get(offUrl, { timeout: 12000 }).then((r) => r.data);
+  return Promise.any([backendReq, offReq]);
+}
+
+export async function fetchProduct(barcode: string) {
+  const offUrl = `${OFF_BASE}/api/v0/product/${barcode}.json`;
+
+  if (!BACKEND_URL) {
+    const response = await axios.get(offUrl, { timeout: 12000 });
+    return response.data;
+  }
 
   try {
-    if (!backendUrl) throw new Error("Backend not configured");
-
-    const response =
-      await axios.get(backendUrl, { timeout: 8000 });
-
-    return response.data;
+    return await raceGet(`${BACKEND_URL}/product/${barcode}`, offUrl);
   } catch {
-    const response =
-      await axios.get(fallbackUrl);
-
+    const response = await axios.get(offUrl, { timeout: 12000 });
     return response.data;
   }
 }
@@ -75,44 +75,31 @@ export async function analyzeProduct(product: any, profile?: any) {
   }
 }
 
-export async function searchProducts(
-  category: string
-) {
+export async function searchProducts(category: string) {
   const query = category?.trim();
-  if (!query) {
-    return [];
-  }
+  if (!query) return [];
 
-  const backendUrl =
-    BACKEND_URL ? `${BACKEND_URL}/search?query=${encodeURIComponent(query)}&page_size=40` : "";
+  const offUrl =
+    `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&json=1&page_size=20`;
 
-  const fallbackUrl =
-    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
-      query
-    )}&search_simple=1&json=1&page_size=40`;
-
-  try {
-    if (!backendUrl) throw new Error("Backend not configured");
-
-    const response =
-      await axios.get(backendUrl, { timeout: 8000 });
-
-    return (
-      response.data
-        ?.products || []
-    );
-  } catch {
+  if (!BACKEND_URL) {
     try {
-      const response =
-        await axios.get(fallbackUrl);
-
-      return (
-        response.data
-          ?.products || []
-      );
+      const response = await axios.get(offUrl, { timeout: 12000 });
+      return response.data?.products || [];
     } catch {
       return [];
     }
+  }
+
+  try {
+    const data = await raceGet(
+      `${BACKEND_URL}/search?query=${encodeURIComponent(query)}&page_size=20`,
+      offUrl
+    );
+    // Backend returns { products: [...] }, OFF returns { products: [...] } too
+    return data?.products || [];
+  } catch {
+    return [];
   }
 }
 
@@ -142,7 +129,7 @@ export async function sendChatMessage(messages: ChatMessage[], profile?: any) {
         ? detail
         : error?.message === BACKEND_REQUIRED_MESSAGE
           ? BACKEND_REQUIRED_MESSAGE
-        : `Unable to reach the nutrition assistant at ${BACKEND_URL}. Check that the backend is running and your phone is on the same Wi-Fi.`
+          : `Unable to reach the nutrition assistant at ${BACKEND_URL}. Check that the backend is running and your phone is on the same Wi-Fi.`
     );
   }
 }
@@ -174,7 +161,7 @@ export async function sendVoiceMessage(
         ? detail
         : error?.message === BACKEND_REQUIRED_MESSAGE
           ? BACKEND_REQUIRED_MESSAGE
-        : `Unable to process the voice message at ${BACKEND_URL}. Check that the backend is running and your phone is on the same Wi-Fi.`
+          : `Unable to process the voice message at ${BACKEND_URL}. Check that the backend is running and your phone is on the same Wi-Fi.`
     );
   }
 }
