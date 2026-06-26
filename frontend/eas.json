@@ -8,7 +8,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "",
+        "EXPO_PUBLIC_BACKEND_URL": "https://nutri-ninja-5-0.onrender.com",
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCZ8M7hphp6KbL-iNBqvPEVpczx8D7MKOA",
         "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "nutri-ninja"
       }
@@ -18,7 +18,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "",
+        "EXPO_PUBLIC_BACKEND_URL": "https://nutri-ninja-5-0.onrender.com",
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCZ8M7hphp6KbL-iNBqvPEVpczx8D7MKOA",
         "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "nutri-ninja"
       }
