@@ -18,7 +18,9 @@ import {
   type Ingredient,
   type AllergenInfo,
 } from '../utils/ingredientParser';
-import { extractTextFromBase64, cleanOCRText } from '../services/ocr';
+import { ChatMessage, sendChatMessage } from '../services/api';
+import { extractTextFromImage, cleanOCRText } from '../services/ocr';
+import { getActiveProfile } from '../utils/localStore';
 
 interface OCRLabelReaderProps {
   onClose: () => void;
@@ -32,30 +34,25 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
   const [allergens, setAllergens] = useState<AllergenInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
   const [healthAssessment, setHealthAssessment] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiAnswer, setAiAnswer] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleImageUpload = async (file: File) => {
     setOcrLoading(true);
+    setOcrProgress(0);
+    setAiAnswer('');
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        if (e.target?.result) {
-          const base64 = (e.target.result as string).split(',')[1];
-          const result = await extractTextFromBase64(base64, (progress) => {
-            console.log('OCR Progress:', progress);
-          });
+      const result = await extractTextFromImage(file, (progress) => setOcrProgress(progress));
 
-          if (result.error) {
-            alert(`OCR Error: ${result.error}`);
-          } else {
-            const cleanedText = cleanOCRText(result.text);
-            setIngredientText(cleanedText);
-          }
-        }
-      };
-      reader.readAsDataURL(file);
+      if (result.error) {
+        alert(`OCR Error: ${result.error}`);
+      } else {
+        const cleanedText = cleanOCRText(result.text);
+        setIngredientText(cleanedText);
+      }
     } finally {
       setOcrLoading(false);
     }
@@ -91,6 +88,11 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
   };
 
   const handleTakePhoto = async () => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+      alert('OCR camera capture is currently available in the web app. You can still upload a label image here.');
+      return;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
       alert('Camera access not available in this browser');
       return;
@@ -102,23 +104,66 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
       });
       const video = document.createElement('video');
       video.srcObject = stream;
-      video.play();
+      video.muted = true;
+      video.playsInline = true;
+      await video.play();
 
-      setTimeout(() => {
+      setTimeout(async () => {
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(video, 0, 0);
-          const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
-          handleImageUpload(new File([atob(imageData)], 'capture.jpg', { type: 'image/jpeg' }));
+          canvas.toBlob((blob) => {
+            if (blob) {
+              handleImageUpload(new File([blob], 'food-label.jpg', { type: 'image/jpeg' }));
+            }
+          }, 'image/jpeg', 0.92);
         }
 
         stream.getTracks().forEach((track) => track.stop());
       }, 1000);
     } catch (error) {
       alert('Camera access denied or unavailable');
+    }
+  };
+
+  const handleCopyText = async () => {
+    if (!ingredientText.trim()) return;
+
+    try {
+      if (Platform.OS === 'web' && navigator.clipboard) {
+        await navigator.clipboard.writeText(ingredientText);
+        alert('Extracted label text copied.');
+      } else {
+        alert('Copy is available in the web app. You can select and copy the extracted text manually.');
+      }
+    } catch {
+      alert('Could not copy automatically. Please select the text and copy it manually.');
+    }
+  };
+
+  const handleAskAI = async () => {
+    const text = ingredientText.trim();
+    if (!text || aiLoading) return;
+
+    setAiLoading(true);
+    setAiAnswer('');
+    try {
+      const profile = getActiveProfile();
+      const messages: ChatMessage[] = [
+        {
+          role: 'user',
+          content: `I extracted this text from a packaged food label using OCR. Identify what product/food this might be if possible, summarize ingredients/nutrition clues, warn about sugar/salt/additives/allergens, and tell whether it fits my profile. OCR text:\n\n${text}`,
+        },
+      ];
+      const answer = await sendChatMessage(messages, profile);
+      setAiAnswer(answer);
+    } catch (error: any) {
+      setAiAnswer(error?.message || 'AI assistant could not analyze this label right now.');
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -140,6 +185,9 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
         {!healthAssessment && (
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <Text style={[styles.cardTitle, { color: palette.text }]}>Step 1: Capture or Upload</Text>
+            <Text style={[styles.helperText, { color: palette.muted }]}>
+              For best OCR, crop near ingredients/nutrition facts and keep the label flat with good light.
+            </Text>
 
             <TouchableOpacity
               style={[styles.button, { backgroundColor: palette.accentBright }]}
@@ -175,6 +223,12 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
               style={{ display: 'none' }}
             />
 
+            {ocrLoading ? (
+              <Text style={[styles.progressText, { color: palette.muted }]}>
+                Extracting label text{ocrProgress ? `... ${Math.round(ocrProgress)}%` : '...'}
+              </Text>
+            ) : null}
+
             <View style={[styles.divider, { borderColor: palette.border }]} />
 
             <Text style={[styles.cardTitle, { color: palette.text, marginTop: 16 }]}>
@@ -190,6 +244,40 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
               multiline
               numberOfLines={6}
             />
+
+            {ingredientText.trim() ? (
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.outlineButton, { borderColor: palette.border }]}
+                  onPress={handleCopyText}
+                >
+                  <SymbolView name={{ ios: 'doc.on.doc', android: 'content_copy', web: 'content_copy' }} tintColor={palette.accentBright} size={18} />
+                  <Text style={[styles.outlineButtonText, { color: palette.accentBright }]}>Copy text</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.outlineButton, { borderColor: palette.border }]}
+                  onPress={handleAskAI}
+                  disabled={aiLoading}
+                >
+                  {aiLoading ? (
+                    <ActivityIndicator color={palette.accentBright} />
+                  ) : (
+                    <SymbolView name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }} tintColor={palette.accentBright} size={18} />
+                  )}
+                  <Text style={[styles.outlineButtonText, { color: palette.accentBright }]}>
+                    {aiLoading ? 'Asking AI...' : 'Ask AI'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {aiAnswer ? (
+              <View style={[styles.aiBox, { backgroundColor: palette.surfaceSoft, borderColor: palette.border }]}>
+                <Text style={[styles.aiTitle, { color: palette.accentBright }]}>AI Assistant Reading</Text>
+                <Text style={[styles.aiText, { color: palette.text }]}>{aiAnswer}</Text>
+              </View>
+            ) : null}
 
             <TouchableOpacity
               style={[styles.analyzeButton, { backgroundColor: palette.accentBright }]}
@@ -314,6 +402,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  helperText: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  progressText: { fontSize: 12, fontWeight: '700', marginBottom: 10, textAlign: 'center' },
   button: {
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -323,6 +413,22 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   buttonContent: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' },
+  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  outlineButton: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  outlineButtonText: { fontSize: 13, fontWeight: '800' },
+  aiBox: { borderRadius: 12, borderWidth: 1, marginBottom: 12, padding: 14 },
+  aiTitle: { fontSize: 13, fontWeight: '900', marginBottom: 8, textTransform: 'uppercase' },
+  aiText: { fontSize: 13, lineHeight: 20 },
   divider: { height: 1, borderWidth: 1, marginVertical: 16 },
   textInput: {
     borderRadius: 8,

@@ -54,6 +54,7 @@ export default function ScannerScreen() {
   const [loading, setLoading] = useState(false);
   const [scanEnabled, setScanEnabled] = useState(true);
   const [showCamera, setShowCamera] = useState(false);
+  const [showOCRReader, setShowOCRReader] = useState(false);
   const isWeb = Platform.OS === "web";
   const hasCameraPermission = permission?.granted === true;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -231,6 +232,14 @@ export default function ScannerScreen() {
     );
   }
 
+  if (showOCRReader) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]} edges={["top", "bottom"]}>
+        <OCRLabelReader onClose={() => setShowOCRReader(false)} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]} edges={["top", "bottom"]}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -311,6 +320,29 @@ export default function ScannerScreen() {
             </ScrollView>
           </View>
         )}
+
+        <View style={[styles.featureCard, { backgroundColor: palette.surface, borderColor: palette.border, marginTop: 12 }]}> 
+          <View style={styles.featureHeader}>
+            <View style={[styles.featureBadge, { backgroundColor: palette.surfaceSoft }]}> 
+              <SymbolView name={{ ios: "doc.text.viewfinder", android: "document_scanner", web: "document_scanner" }} tintColor={palette.accentBright} size={24} />
+            </View>
+            <View style={styles.featureTextBlock}>
+              <Text style={[styles.featureTitle, { color: palette.text }]}>Food Label OCR</Text>
+              <Text style={[styles.featureSubtitle, { color: palette.muted }]}>
+                Capture package labels like ingredients or nutrition facts, copy the text, and ask AI what it means.
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: palette.accentBright }]}
+            onPress={() => setShowOCRReader(true)}
+          >
+            <View style={styles.buttonContent}>
+              <SymbolView name={{ ios: "camera.viewfinder", android: "center_focus_strong", web: "center_focus_strong" }} tintColor={palette.onAccent} size={20} />
+              <Text style={[styles.primaryButtonText, { color: palette.onAccent }]}>Open Label Lens</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         <View style={[styles.featureCard, { backgroundColor: palette.surface, borderColor: palette.border, marginTop: 12 }]}> 
           <View style={styles.featureHeader}>
@@ -443,6 +475,7 @@ const styles = StyleSheet.create({
   featureTitle: { fontSize: 17, fontWeight: "900", marginBottom: 4 },
   featureSubtitle: { fontSize: 13, lineHeight: 20 },
   primaryButton: { alignItems: "center", borderRadius: 16, paddingVertical: 14, marginTop: 6 },
+  buttonContent: { alignItems: "center", flexDirection: "row", gap: 8, justifyContent: "center" },
   primaryButtonText: { fontSize: 15, fontWeight: "900" },
   barcodeDisplay: { alignItems: "center", borderRadius: 16, borderWidth: 1, marginVertical: 16, padding: 14 },
   secondaryButton: { alignItems: "center", borderRadius: 16, paddingVertical: 14, marginTop: 6 },

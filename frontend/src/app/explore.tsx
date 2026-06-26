@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { SymbolView } from "expo-symbols";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -14,6 +14,7 @@ import {
 
 import { ChatMessage, sendChatMessage, sendVoiceMessage } from "../services/api";
 import { getActiveProfile } from "../utils/localStore";
+import { cancelSpeech, speakAutoLanguage } from "../utils/speech";
 import { useThemeMode } from "../utils/themeMode";
 
 const welcome: ChatMessage[] = [
@@ -24,6 +25,20 @@ const welcome: ChatMessage[] = [
   },
 ];
 
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onstart: (() => void) | null;
+  onresult: ((event: any) => void) | null;
+  onerror: ((event: any) => void) | null;
+  onend: (() => void) | null;
+};
+
 export default function ExploreScreen() {
   const { palette } = useThemeMode();
   const [messages, setMessages] = useState<ChatMessage[]>(welcome);
@@ -31,34 +46,40 @@ export default function ExploreScreen() {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceReplies, setVoiceReplies] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [voiceMode, setVoiceMode] = useState<"idle" | "live" | "recording">("idle");
   const scrollRef = useRef<ScrollView | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const transcriptRef = useRef("");
+  const voiceRepliesRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.abort();
+      recorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      cancelSpeech();
+    };
+  }, []);
+
+  const setSpokenReplies = (enabled: boolean) => {
+    voiceRepliesRef.current = enabled;
+    setVoiceReplies(enabled);
+    if (!enabled) cancelSpeech();
+  };
 
   const speak = (text: string) => {
-    if (
-      !voiceReplies ||
-      Platform.OS !== "web" ||
-      typeof window === "undefined" ||
-      !("speechSynthesis" in window)
-    ) {
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-IN";
-    utterance.rate = 1;
-    window.speechSynthesis.speak(utterance);
+    speakAutoLanguage(text, { enabled: voiceRepliesRef.current });
   };
 
   const toggleVoiceReplies = () => {
     setVoiceReplies((enabled) => {
       const nextEnabled = !enabled;
-      if (!nextEnabled && Platform.OS === "web" && typeof window !== "undefined") {
-        window.speechSynthesis?.cancel();
-      }
+      voiceRepliesRef.current = nextEnabled;
+      if (!nextEnabled) cancelSpeech();
       return nextEnabled;
     });
   };
@@ -73,6 +94,8 @@ export default function ExploreScreen() {
     ];
     setMessages(nextMessages);
     setDraft("");
+    setLiveTranscript("");
+    transcriptRef.current = "";
     setLoading(true);
 
     try {
@@ -109,6 +132,7 @@ export default function ExploreScreen() {
   const submitVoiceMessage = async (blob: Blob) => {
     if (!blob.size) return;
     setLoading(true);
+    setLiveTranscript("");
     setMessages((current) => [
       ...current,
       { role: "user", content: "Voice message" },
@@ -140,6 +164,83 @@ export default function ExploreScreen() {
     }
   };
 
+  const startSpeechRecognition = () => {
+    const SpeechRecognitionConstructor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionConstructor) return false;
+
+    cancelSpeech();
+    setSpokenReplies(true);
+    setLiveTranscript("");
+
+    const recognition = new SpeechRecognitionConstructor() as SpeechRecognitionLike;
+    recognition.lang = "hi-IN";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
+
+    let finalTranscript = "";
+
+    recognition.onstart = () => {
+      setVoiceMode("live");
+      setListening(true);
+      setLiveTranscript("Listening...");
+    };
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = "";
+      finalTranscript = "";
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const transcript = String(event.results[index]?.[0]?.transcript || "").trim();
+        if (event.results[index]?.isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      const displayText = finalTranscript || interimTranscript;
+      if (displayText) {
+        transcriptRef.current = displayText;
+        setLiveTranscript(displayText);
+        setDraft(displayText);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      setListening(false);
+      setVoiceMode("idle");
+      const error = event?.error;
+      const message =
+        error === "not-allowed"
+          ? "Microphone permission is blocked. Allow microphone access and try again."
+          : error === "no-speech"
+            ? "I could not hear clearly. Please tap the mic and speak again."
+            : "Voice recognition could not start. Try again or type your question.";
+      setMessages((current) => [...current, { role: "assistant", content: message }]);
+    };
+
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setListening(false);
+      setVoiceMode("idle");
+
+      const content = (finalTranscript || transcriptRef.current).trim();
+      if (content) {
+        setTimeout(() => submitMessage(content), 50);
+      } else {
+        setLiveTranscript("");
+        transcriptRef.current = "";
+      }
+    };
+
+    recognition.start();
+    return true;
+  };
+
   const startVoiceChat = async () => {
     if (Platform.OS !== "web" || typeof window === "undefined") {
       setMessages((current) => [
@@ -152,8 +253,17 @@ export default function ExploreScreen() {
       return;
     }
 
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
+
     if (listening && recorderRef.current) {
       recorderRef.current.stop();
+      return;
+    }
+
+    if (startSpeechRecognition()) {
       return;
     }
 
@@ -169,7 +279,8 @@ export default function ExploreScreen() {
     }
 
     try {
-      window.speechSynthesis?.cancel();
+      cancelSpeech();
+      setSpokenReplies(true);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       chunksRef.current = [];
@@ -187,12 +298,16 @@ export default function ExploreScreen() {
         streamRef.current = null;
         recorderRef.current = null;
         setListening(false);
+        setVoiceMode("idle");
         submitVoiceMessage(blob);
       };
       recorder.start();
+      setVoiceMode("recording");
       setListening(true);
+      setLiveTranscript("Recording audio... tap mic again to send.");
     } catch (error: any) {
       setListening(false);
+      setVoiceMode("idle");
       const denied = error?.name === "NotAllowedError";
       setMessages((current) => [
         ...current,
@@ -215,7 +330,7 @@ export default function ExploreScreen() {
         <View>
           <Text style={[styles.title, { color: palette.text }]}>AI Nutrition Assistant</Text>
           <Text style={[styles.subtitle, { color: palette.muted }]}>
-            Tap once to record, speak, then tap again to send.
+            Tap mic and speak. I will listen, answer, and read it back.
           </Text>
         </View>
         <TouchableOpacity
@@ -266,6 +381,15 @@ export default function ExploreScreen() {
           <View style={[styles.thinking, { backgroundColor: palette.surface }]}>
             <ActivityIndicator color={palette.accentBright} />
             <Text style={{ color: palette.muted }}>Nutri Ninja is thinking...</Text>
+          </View>
+        ) : null}
+        {listening || liveTranscript ? (
+          <View style={[styles.liveStatus, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <View style={[styles.liveDot, { backgroundColor: listening ? palette.danger : palette.accentBright }]} />
+            <Text style={[styles.liveStatusText, { color: palette.text }]}>
+              {voiceMode === "recording" ? "Recording: " : voiceMode === "live" ? "Listening: " : ""}
+              {liveTranscript || "Ready for voice chat"}
+            </Text>
           </View>
         ) : null}
       </ScrollView>
@@ -359,6 +483,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 12,
   },
+  liveStatus: {
+    alignItems: "center",
+    alignSelf: "stretch",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  liveDot: {
+    borderRadius: 6,
+    height: 12,
+    width: 12,
+  },
+  liveStatusText: { flex: 1, fontSize: 13, fontWeight: "700", lineHeight: 19 },
   composer: {
     alignItems: "center",
     borderTopWidth: 1,

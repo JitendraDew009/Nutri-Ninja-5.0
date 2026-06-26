@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { SymbolView } from "expo-symbols";
 import {
   ActivityIndicator,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import {
 
 import { ChatMessage, sendChatMessage } from "../services/api";
 import { getActiveProfile } from "../utils/localStore";
+import { cancelSpeech, speakAutoLanguage } from "../utils/speech";
 import { useThemeMode } from "../utils/themeMode";
 
 interface DietAdvisorChatProps {
@@ -61,28 +61,13 @@ export default function DietAdvisorChat({
   }, [product.code]);
 
   const speak = (text: string) => {
-    if (
-      !voiceReplies ||
-      Platform.OS !== "web" ||
-      typeof window === "undefined" ||
-      !("speechSynthesis" in window)
-    ) {
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-IN";
-    utterance.rate = 1;
-    window.speechSynthesis.speak(utterance);
+    speakAutoLanguage(text, { enabled: voiceReplies });
   };
 
   const toggleVoiceReplies = () => {
     setVoiceReplies((enabled) => {
       const nextEnabled = !enabled;
-      if (!nextEnabled && Platform.OS === "web" && typeof window !== "undefined") {
-        window.speechSynthesis?.cancel();
-      }
+      if (!nextEnabled) cancelSpeech();
       return nextEnabled;
     });
   };

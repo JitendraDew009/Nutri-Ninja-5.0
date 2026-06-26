@@ -1,6 +1,29 @@
 import axios from "axios";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 
-const BACKEND_URL = "http://127.0.0.1:8000";
+function getBackendUrl() {
+  const envUrl = process.env.EXPO_PUBLIC_BACKEND_URL?.trim();
+  if (envUrl) return envUrl.replace(/\/$/, "");
+
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    return `http://${window.location.hostname}:8000`;
+  }
+
+  const constants = Constants as any;
+  const hostUri =
+    constants?.expoConfig?.hostUri ||
+    constants?.manifest?.debuggerHost ||
+    constants?.manifest2?.extra?.expoClient?.hostUri;
+
+  const host = typeof hostUri === "string" ? hostUri.split(":")[0] : "";
+  if (host) return `http://${host}:8000`;
+
+  if (Platform.OS === "android") return "http://10.0.2.2:8000";
+  return "http://127.0.0.1:8000";
+}
+
+const BACKEND_URL = getBackendUrl();
 
 export async function fetchProduct(
   barcode: string
@@ -101,7 +124,7 @@ export async function sendChatMessage(messages: ChatMessage[], profile?: any) {
     throw new Error(
       typeof detail === "string"
         ? detail
-        : "Unable to reach the nutrition assistant. Check the backend and internet connection."
+        : `Unable to reach the nutrition assistant at ${BACKEND_URL}. Check that the backend is running and your phone is on the same Wi-Fi.`
     );
   }
 }
@@ -129,7 +152,7 @@ export async function sendVoiceMessage(
     throw new Error(
       typeof detail === "string"
         ? detail
-        : "Unable to process the voice message. Please try again."
+        : `Unable to process the voice message at ${BACKEND_URL}. Check that the backend is running and your phone is on the same Wi-Fi.`
     );
   }
 }
