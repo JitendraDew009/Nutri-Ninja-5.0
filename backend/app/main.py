@@ -88,6 +88,8 @@ ADDITIVE_TERMS = [
 GOOD_TERMS = ["whole wheat", "oats", "millet", "ragi", "jowar", "bran", "fiber", "fibre", "protein", "lentil"]
 OPENAI_API_BASE = "https://api.openai.com/v1"
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 
 def health_score(product: dict[str, Any]) -> int:
@@ -268,53 +270,84 @@ def build_system_prompt(profile: dict[str, Any]) -> str:
     )
 
 
-def call_openai_chat(messages: list[dict[str, Any]], profile: dict[str, Any] | None) -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
+def _try_openai(messages: list[dict[str, Any]], profile: dict[str, Any]) -> str | None:
+    """Try OpenAI. Returns answer string or None if unavailable/no credits."""
+    api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="AI chat is not configured. Add OPENAI_API_KEY to Render environment variables.",
-        )
-
-    profile = profile or {}
-    openai_messages = [
-        {"role": "system", "content": build_system_prompt(profile)},
-        *[{"role": m["role"], "content": m["content"]} for m in messages if m.get("content", "").strip()],
-    ]
-
+        return None
     try:
-        response = requests.post(
+        openai_messages = [
+            {"role": "system", "content": build_system_prompt(profile)},
+            *[{"role": m["role"], "content": m["content"]} for m in messages if m.get("content", "").strip()],
+        ]
+        r = requests.post(
             f"{OPENAI_API_BASE}/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={"model": OPENAI_MODEL, "messages": openai_messages, "max_tokens": 400},
             timeout=60,
         )
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"].strip()
+        return None  # quota/auth error — fall through to Gemini
+    except Exception:
+        return None
 
-        if response.status_code == 200:
-            answer = response.json()["choices"][0]["message"]["content"].strip()
-            if not answer:
-                raise HTTPException(status_code=502, detail="OpenAI returned an empty response.")
-            return answer
 
-        if response.status_code == 429:
-            raise HTTPException(status_code=429, detail="AI is busy right now. Please try again in a moment.")
+def _try_gemini(messages: list[dict[str, Any]], profile: dict[str, Any]) -> str | None:
+    """Try Gemini. Returns answer string or None if unavailable."""
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        contents = [
+            {"role": "model" if m["role"] == "assistant" else "user",
+             "parts": [{"text": m["content"].strip()}]}
+            for m in messages if m.get("content", "").strip()
+        ]
+        request_body = {
+            "system_instruction": {"parts": [{"text": build_system_prompt(profile)}]},
+            "contents": contents,
+            "generationConfig": {"maxOutputTokens": 400},
+        }
+        r = requests.post(
+            f"{GEMINI_API_BASE}/{GEMINI_MODEL}:generateContent",
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            json=request_body,
+            timeout=60,
+        )
+        if r.status_code == 200:
+            parts = []
+            for candidate in r.json().get("candidates") or []:
+                for part in (candidate.get("content") or {}).get("parts") or []:
+                    if isinstance(part.get("text"), str):
+                        parts.append(part["text"])
+            answer = "\n".join(parts).strip()
+            return answer if answer else None
+        return None
+    except Exception:
+        return None
 
-        if response.status_code in (401, 403):
-            raise HTTPException(
-                status_code=503,
-                detail="OpenAI API key is invalid. Update OPENAI_API_KEY in Render environment variables.",
-            )
 
-        try:
-            err = response.json().get("error", {}).get("message", "")
-        except Exception:
-            err = ""
-        raise HTTPException(status_code=502, detail=f"OpenAI error {response.status_code}: {err or 'Unknown error'}")
+def call_openai_chat(messages: list[dict[str, Any]], profile: dict[str, Any] | None) -> str:
+    """Try OpenAI first, fall back to Gemini automatically."""
+    profile = profile or {}
 
-    except HTTPException:
-        raise
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Could not reach OpenAI. Check your internet connection.") from exc
+    answer = _try_openai(messages, profile)
+    if answer:
+        return answer
+
+    answer = _try_gemini(messages, profile)
+    if answer:
+        return answer
+
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "AI assistant is not available right now. "
+            "Please add OPENAI_API_KEY (with billing) or GEMINI_API_KEY (from aistudio.google.com/apikey) "
+            "in Render environment variables."
+        ),
+    )
 
 
 def transcribe_audio(audio_bytes: bytes, mime_type: str) -> str:
@@ -446,29 +479,24 @@ def history():
 
 @app.get("/test-ai")
 def test_ai():
-    """Open in browser to verify OpenAI API key is working."""
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key:
-        return {"status": "error", "reason": "OPENAI_API_KEY not set in Render environment variables."}
-    try:
-        r = requests.post(
-            f"{OPENAI_API_BASE}/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": OPENAI_MODEL, "messages": [{"role": "user", "content": "Say hello in one sentence."}], "max_tokens": 50},
-            timeout=30,
-        )
-        if r.status_code == 200:
-            reply = r.json()["choices"][0]["message"]["content"].strip()
-            return {"status": "ok", "model": OPENAI_MODEL, "reply": reply}
-        try:
-            err = r.json().get("error", {})
-        except Exception:
-            err = {}
-        return {
-            "status": "error",
-            "http_status": r.status_code,
-            "message": err.get("message", r.text[:300]),
-            "fix": "Update OPENAI_API_KEY in Render environment variables.",
-        }
-    except Exception as exc:
-        return {"status": "error", "reason": str(exc)}
+    """Open in browser to check which AI provider is working."""
+    test_msgs = [{"role": "user", "content": "Say hello in one sentence."}]
+    profile = {"name": "Test", "goal": "general"}
+
+    openai_ok = _try_openai(test_msgs, profile)
+    gemini_ok = _try_gemini(test_msgs, profile)
+
+    if openai_ok:
+        return {"status": "ok", "provider": "OpenAI", "model": OPENAI_MODEL, "reply": openai_ok}
+    if gemini_ok:
+        return {"status": "ok", "provider": "Gemini", "model": GEMINI_MODEL, "reply": gemini_ok}
+
+    return {
+        "status": "error",
+        "openai": "no credits or invalid key" if os.getenv("OPENAI_API_KEY") else "OPENAI_API_KEY not set",
+        "gemini": "quota 0 or invalid key" if os.getenv("GEMINI_API_KEY") else "GEMINI_API_KEY not set",
+        "fix": (
+            "Option A: Add billing at platform.openai.com then update OPENAI_API_KEY on Render. "
+            "Option B: Get a free key from aistudio.google.com/apikey and set GEMINI_API_KEY on Render."
+        ),
+    }
