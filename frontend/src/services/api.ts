@@ -34,11 +34,16 @@ const BACKEND_REQUIRED_MESSAGE =
 const OFF_BASE = "https://world.openfoodfacts.org";
 
 // Race backend against OpenFoodFacts directly — whichever replies first wins.
-// This eliminates the cold-start wait on Render free tier.
+// Falls back gracefully if both fail.
 async function raceGet(backendUrl: string, offUrl: string): Promise<any> {
   const backendReq = axios.get(backendUrl, { timeout: 6000 }).then((r) => r.data);
   const offReq = axios.get(offUrl, { timeout: 12000 }).then((r) => r.data);
-  return Promise.any([backendReq, offReq]);
+  try {
+    return await Promise.any([backendReq, offReq]);
+  } catch {
+    // Both failed — throw so caller can handle
+    throw new Error("Both backend and OpenFoodFacts are unreachable.");
+  }
 }
 
 export async function fetchProduct(barcode: string) {

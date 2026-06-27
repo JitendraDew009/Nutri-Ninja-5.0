@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -50,13 +51,22 @@ function gradeFromScore(score: number) {
 
 export default function GroceryBasketScreen() {
   const { palette } = useThemeMode();
-  const activeProfile = getActiveProfile();
+  const [activeProfile, setActiveProfile] = useState(getActiveProfile);
   const basketKey = profileStoreKey("groceryBasket", activeProfile.id);
   const [basket, setBasket] = useState<any[]>(() => readStore(basketKey, []));
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [openingCode, setOpeningCode] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState("");
+
+  // Refresh basket every time this tab is focused so additions from other screens are visible
+  useFocusEffect(
+    useCallback(() => {
+      const profile = getActiveProfile();
+      setActiveProfile(profile);
+      setBasket(readStore(profileStoreKey("groceryBasket", profile.id), []));
+    }, [])
+  );
 
   const basketScore = useMemo(() => {
     if (!basket.length) return 0;

@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SymbolView } from "expo-symbols";
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -26,6 +27,17 @@ export default function HistoryScreen() {
   const [profiles, setProfiles] = useState<UserProfile[]>(getFamilyProfiles);
   const [history, setHistory] = useState<any[]>(() => readStore(profileStoreKey("scanHistory", activeProfile.id), []));
   const [basket, setBasket] = useState<any[]>(() => readStore(profileStoreKey("groceryBasket", activeProfile.id), []));
+
+  // Always refresh when this tab comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const profile = getActiveProfile();
+      setProfiles(getFamilyProfiles());
+      setActiveProfile(profile);
+      setHistory(readStore(profileStoreKey("scanHistory", profile.id), []));
+      setBasket(readStore(profileStoreKey("groceryBasket", profile.id), []));
+    }, [])
+  );
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [openingProduct, setOpeningProduct] = useState(false);
 

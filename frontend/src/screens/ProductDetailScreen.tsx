@@ -52,8 +52,15 @@ export default function ProductDetailScreen({
     const load = async () => {
       setLoading(true);
       try {
-        const category = product.categories_en || product.categories || product.product_name || "";
-        const candidates = await searchProducts(category);
+        // categories_en is a comma-separated list like "en:biscuits,en:snacks" — use just the first clean word
+        const rawCategory = product.categories_en || product.categories || "";
+        const firstCategory = rawCategory
+          .split(",")[0]
+          .replace(/^en:/i, "")
+          .replace(/-/g, " ")
+          .trim();
+        const query = firstCategory || product.product_name || "";
+        const candidates = await searchProducts(query);
         setRecommendations(getRecommendations(product, candidates));
       } catch {
         setRecommendations({ better: [], worse: [] });
