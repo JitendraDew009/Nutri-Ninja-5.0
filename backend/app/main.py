@@ -320,38 +320,61 @@ def generate_gemini(contents: list[dict[str, Any]], profile: dict[str, Any] | No
                 json=request_body,
                 timeout=60,
             )
-            if response.status_code != 429:
+
+            if response.status_code == 200:
                 break
 
-            error_data = response.json()
-            delay = retry_delay_seconds(error_data)
-            # Auto-retry for short waits (up to 15 seconds)
-            if attempt < 2 and delay is not None and delay <= 15:
-                time.sleep(delay + 0.5)
-                continue
+            if response.status_code == 429:
+                error_data = response.json()
+                delay = retry_delay_seconds(error_data)
+                if attempt < 2 and delay is not None and delay <= 15:
+                    time.sleep(delay + 0.5)
+                    continue
+                wait_seconds = max(1, round(delay or 30))
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"AI is busy right now. Please wait {wait_seconds} seconds and try again.",
+                )
 
-            wait_seconds = max(1, round(delay or 30))
+            if response.status_code in (401, 403):
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Gemini API key is invalid or the Generative Language API is not enabled. "
+                        "Go to https://aistudio.google.com/apikey, create a new key, and update "
+                        "GEMINI_API_KEY in your Render environment variables."
+                    ),
+                )
+
+            if response.status_code == 404:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Gemini model '{GEMINI_MODEL}' not found. Set GEMINI_MODEL=gemini-1.5-flash in Render env vars.",
+                )
+
+            # Any other error — surface the Gemini message
+            try:
+                err_msg = response.json().get("error", {}).get("message", "")
+            except Exception:
+                err_msg = ""
             raise HTTPException(
-                status_code=429,
-                detail=f"AI is busy right now. Please wait {wait_seconds} seconds and try again.",
+                status_code=502,
+                detail=f"Gemini error {response.status_code}: {err_msg or 'Unknown error'}",
             )
 
         assert response is not None
-        response.raise_for_status()
         answer = response_text(response.json())
+
     except HTTPException:
         raise
     except requests.RequestException as exc:
-        detail = "The AI service could not be reached."
-        if exc.response is not None:
-            try:
-                detail = exc.response.json().get("error", {}).get("message") or detail
-            except ValueError:
-                pass
-        raise HTTPException(status_code=502, detail=detail) from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Could not reach Gemini API. Check your internet connection and try again.",
+        ) from exc
 
     if not answer:
-        raise HTTPException(status_code=502, detail="The AI service returned an empty response.")
+        raise HTTPException(status_code=502, detail="Gemini returned an empty response.")
     return answer
 
 
@@ -361,6 +384,39 @@ def home():
         "message": "Nutri Ninja API running",
         "features": ["product lookup", "search", "analysis", "recommendations", "profile", "history"],
     }
+
+
+@app.get("/test-ai")
+def test_ai():
+    """Open this in a browser to check if your Gemini API key is working."""
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        return {"status": "error", "reason": "GEMINI_API_KEY not set in environment variables."}
+    try:
+        r = requests.post(
+            f"{GEMINI_API_BASE}/{GEMINI_MODEL}:generateContent",
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            json={"contents": [{"role": "user", "parts": [{"text": "Say hello in one sentence."}]}]},
+            timeout=30,
+        )
+        if r.status_code == 200:
+            return {"status": "ok", "model": GEMINI_MODEL, "reply": response_text(r.json())}
+        try:
+            err = r.json().get("error", {})
+        except Exception:
+            err = {}
+        return {
+            "status": "error",
+            "http_status": r.status_code,
+            "code": err.get("code"),
+            "message": err.get("message", r.text[:300]),
+            "fix": (
+                "Go to https://aistudio.google.com/apikey → Create API key → "
+                "update GEMINI_API_KEY on Render dashboard."
+            ),
+        }
+    except Exception as exc:
+        return {"status": "error", "reason": str(exc)}
 
 
 @app.get("/product/{barcode}")
