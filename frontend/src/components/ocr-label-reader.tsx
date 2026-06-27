@@ -184,60 +184,55 @@ export default function OCRLabelReader({ onClose, onIngredientsExtracted }: OCRL
         {/* Upload/Camera Section */}
         {!healthAssessment && (
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.cardTitle, { color: palette.text }]}>Step 1: Capture or Upload</Text>
-            <Text style={[styles.helperText, { color: palette.muted }]}>
-              For best OCR, crop near ingredients/nutrition facts and keep the label flat with good light.
-            </Text>
-
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: palette.accentBright }]}
-              onPress={handleTakePhoto}
-              disabled={ocrLoading}
-            >
-              {ocrLoading ? (
-                <ActivityIndicator color={palette.background} />
-              ) : (
-                <View style={styles.buttonContent}>
-                  <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} tintColor="#071007" size={20} />
-                  <Text style={styles.buttonText}>Take photo</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: palette.accentBright, opacity: 0.8 }]}
-              onPress={() => {
-                if (Platform.OS === 'web') fileInputRef.current?.click();
-                else alert('Image upload OCR is currently available in the web app. You can paste label text manually here.');
-              }}
-              disabled={ocrLoading}
-            >
-              <View style={styles.buttonContent}>
-                <SymbolView name={{ ios: 'square.and.arrow.up', android: 'upload', web: 'upload' }} tintColor="#071007" size={20} />
-                <Text style={styles.buttonText}>Upload image</Text>
-              </View>
-            </TouchableOpacity>
-
             {Platform.OS === 'web' ? (
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-              />
-            ) : null}
+              <>
+                <Text style={[styles.cardTitle, { color: palette.text }]}>Step 1: Capture or Upload</Text>
+                <Text style={[styles.helperText, { color: palette.muted }]}>
+                  For best OCR, crop near ingredients/nutrition facts and keep the label flat with good light.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: palette.accentBright }]}
+                  onPress={handleTakePhoto}
+                  disabled={ocrLoading}
+                >
+                  {ocrLoading ? (
+                    <ActivityIndicator color={palette.background} />
+                  ) : (
+                    <View style={styles.buttonContent}>
+                      <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} tintColor="#071007" size={20} />
+                      <Text style={styles.buttonText}>Take photo</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: palette.accentBright, opacity: 0.8 }]}
+                  onPress={() => fileInputRef.current?.click()}
+                  disabled={ocrLoading}
+                >
+                  <View style={styles.buttonContent}>
+                    <SymbolView name={{ ios: 'square.and.arrow.up', android: 'upload', web: 'upload' }} tintColor="#071007" size={20} />
+                    <Text style={styles.buttonText}>Upload image</Text>
+                  </View>
+                </TouchableOpacity>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} />
+                {ocrLoading ? (
+                  <Text style={[styles.progressText, { color: palette.muted }]}>
+                    Extracting label text{ocrProgress ? `... ${Math.round(ocrProgress)}%` : '...'}
+                  </Text>
+                ) : null}
+                <View style={[styles.divider, { borderColor: palette.border }]} />
+              </>
+            ) : (
+              <View style={[styles.androidHint, { backgroundColor: palette.surfaceSoft, borderColor: palette.border }]}>
+                <SymbolView name={{ ios: 'info.circle.fill', android: 'info', web: 'info' }} tintColor={palette.accentBright} size={22} />
+                <Text style={[styles.androidHintText, { color: palette.muted }]}>
+                  Tip: Open the product package, photograph the ingredients list with your phone camera, then manually type or paste the text below. Tap "Ask AI" to get instant analysis.
+                </Text>
+              </View>
+            )}
 
-            {ocrLoading ? (
-              <Text style={[styles.progressText, { color: palette.muted }]}>
-                Extracting label text{ocrProgress ? `... ${Math.round(ocrProgress)}%` : '...'}
-              </Text>
-            ) : null}
-
-            <View style={[styles.divider, { borderColor: palette.border }]} />
-
-            <Text style={[styles.cardTitle, { color: palette.text, marginTop: 16 }]}>
-              Step 2: Paste Ingredients Text
+            <Text style={[styles.cardTitle, { color: palette.text, marginTop: Platform.OS === 'web' ? 16 : 0 }]}>
+              {Platform.OS === 'web' ? 'Step 2: Paste Ingredients Text' : 'Paste Ingredients Text'}
             </Text>
 
             <TextInput
@@ -490,4 +485,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeButtonText: { fontWeight: '600', fontSize: 14 },
+  androidHint: {
+    alignItems: 'flex-start',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+    padding: 14,
+  },
+  androidHintText: { flex: 1, fontSize: 13, lineHeight: 20 },
 });

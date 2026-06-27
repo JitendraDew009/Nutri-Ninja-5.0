@@ -85,7 +85,6 @@ export default function HistoryScreen() {
     const nextBasket = [summary, ...basket.filter((item) => (item.code || item.product_name) !== summary.code)].slice(0, 30);
     setBasket(nextBasket);
     writeStore(profileStoreKey("groceryBasket", activeProfile.id), nextBasket);
-    alert("Added to Grocery Basket");
   };
 
   const removeScan = (id: string) => {

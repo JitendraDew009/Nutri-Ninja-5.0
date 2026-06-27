@@ -478,20 +478,26 @@ export default function ExploreScreen() {
       </ScrollView>
 
       <View style={[styles.composer, { backgroundColor: palette.header, borderColor: palette.border }]}>
-        <TouchableOpacity
-          style={[
-            styles.micButton,
-            { backgroundColor: liveConversation || listening ? palette.danger : palette.surfaceSoft },
-          ]}
-          onPress={startVoiceChat}
-          disabled={loading}
-        >
-          <SymbolView
-            name={{ ios: "mic.fill", android: "mic", web: "mic" }}
-            tintColor={liveConversation || listening ? "#fff" : palette.accentBright}
-            size={25}
-          />
-        </TouchableOpacity>
+        {Platform.OS === "web" ? (
+          <TouchableOpacity
+            style={[
+              styles.micButton,
+              { backgroundColor: liveConversation || listening ? palette.danger : palette.surfaceSoft },
+            ]}
+            onPress={startVoiceChat}
+            disabled={loading}
+          >
+            <SymbolView
+              name={{ ios: "mic.fill", android: "mic", web: "mic" }}
+              tintColor={liveConversation || listening ? "#fff" : palette.accentBright}
+              size={25}
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.micButton, { backgroundColor: palette.surfaceSoft, opacity: 0.4 }]}>
+            <SymbolView name={{ ios: "mic.slash.fill", android: "mic_off", web: "mic_off" }} tintColor={palette.muted} size={25} />
+          </View>
+        )}
         <TextInput
           style={[
             styles.input,

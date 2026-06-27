@@ -47,6 +47,7 @@ export default function ProductDetailScreen({
   const scrollRef = useRef<ScrollView | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendations>({ better: [], worse: [] });
   const [loading, setLoading] = useState(false);
+  const [basketAdded, setBasketAdded] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -138,15 +139,25 @@ export default function ProductDetailScreen({
 
         {onAddToBasket ? (
           <TouchableOpacity
-            style={[styles.basketButton, { backgroundColor: palette.accentBright }]}
-            onPress={() => onAddToBasket(product)}
+            style={[styles.basketButton, { backgroundColor: basketAdded ? "#16a34a" : palette.accentBright }]}
+            onPress={() => {
+              onAddToBasket(product);
+              setBasketAdded(true);
+              setTimeout(() => setBasketAdded(false), 2000);
+            }}
           >
             <SymbolView
-              name={{ ios: "cart.badge.plus", android: "add_shopping_cart", web: "add_shopping_cart" }}
+              name={{
+                ios: basketAdded ? "checkmark.circle.fill" : "cart.badge.plus",
+                android: basketAdded ? "check_circle" : "add_shopping_cart",
+                web: basketAdded ? "check_circle" : "add_shopping_cart",
+              }}
               tintColor={palette.onAccent}
               size={26}
             />
-            <Text style={[styles.basketButtonText, { color: palette.onAccent }]}>Add to Grocery Basket</Text>
+            <Text style={[styles.basketButtonText, { color: palette.onAccent }]}>
+              {basketAdded ? "Added to Basket!" : "Add to Grocery Basket"}
+            </Text>
           </TouchableOpacity>
         ) : null}
 

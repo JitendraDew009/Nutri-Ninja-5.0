@@ -176,7 +176,6 @@ export default function ScannerScreen() {
     ].slice(0, 30);
     setBasket(nextBasket);
     writeStore(profileStoreKey("groceryBasket", profile.id), nextBasket);
-    alert("Added to grocery basket");
   };
 
   useEffect(() => {
@@ -357,6 +356,7 @@ export default function ScannerScreen() {
                 style={styles.camera}
                 onBarcodeScanned={scanEnabled ? handleBarcodeScanned : undefined}
                 ratio="16:9"
+                barcodeTypes={["qr", "ean13", "ean8", "upc_a", "upc_e", "code128", "code39", "itf14"]}
               />
               <View style={styles.cameraShade}>
                 <View style={[styles.scanLine, { backgroundColor: palette.accentBright }]} />
