@@ -241,17 +241,17 @@ export default function ScannerScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={[styles.profileHeader, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
           <View style={styles.profileBrand}> 
-            <View style={[styles.logoCircle, { backgroundColor: palette.surfaceSoft }]}> 
+            <View style={[styles.logoCircle, { backgroundColor: palette.surfaceSoft }]}>
               <SymbolView name={{ ios: "person.fill", android: "person", web: "person" }} tintColor={palette.accentBright} size={24} />
             </View>
-            <View>
-              <Text style={[styles.profileName, { color: palette.text }]}>Hello, {profile.name}</Text>
-              <Text style={[styles.profileSubtitle, { color: palette.muted }]}>Welcome back to your scanner.</Text>
+            <View style={styles.profileTextBlock}>
+              <Text style={[styles.profileName, { color: palette.text }]} numberOfLines={1}>Hello, {profile.name}</Text>
+              <Text style={[styles.profileSubtitle, { color: palette.muted }]} numberOfLines={1}>Welcome back to your scanner.</Text>
             </View>
           </View>
-          <View style={[styles.goalBadge, { backgroundColor: palette.surfaceSoft }]}> 
+          <View style={[styles.goalBadge, { backgroundColor: palette.surfaceSoft }]}>
             <Text style={[styles.goalLabel, { color: palette.muted }]}>Dietary Goal</Text>
-            <Text style={[styles.goalValue, { color: palette.accentBright }]}>{goalLabels[profile.goal]}</Text>
+            <Text style={[styles.goalValue, { color: palette.accentBright }]} numberOfLines={1}>{goalLabels[profile.goal]}</Text>
           </View>
         </View>
 
@@ -433,7 +433,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     padding: 18,
   },
-  profileBrand: { alignItems: "center", flexDirection: "row", gap: 12, flex: 1 },
+  profileBrand: { alignItems: "center", flexDirection: "row", gap: 12, flex: 1, minWidth: 0 },
+  profileTextBlock: { flex: 1, minWidth: 0 },
   logoCircle: {
     alignItems: "center",
     borderRadius: 18,
@@ -448,7 +449,8 @@ const styles = StyleSheet.create({
   goalBadge: {
     alignItems: "flex-end",
     borderRadius: 16,
-    minWidth: 120,
+    flexShrink: 0,
+    maxWidth: 130,
     padding: 12,
   },
   goalLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 },
