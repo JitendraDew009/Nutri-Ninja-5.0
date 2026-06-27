@@ -1,88 +1,57 @@
-# Nutri Ninja 5.0 - Build Setup Guide
+# Build Setup
 
-## Prerequisites
+> Full details in [README.md](README.md)
 
-- Node.js v18 or newer
-- npm
-- Python 3.9 or newer
+## Build Android APK (EAS Cloud Build)
 
-## Automated Setup
+Open **Command Prompt** on Windows:
 
-Windows:
-
-```powershell
-.\build-setup.ps1
+```cmd
+set NODE_TLS_REJECT_UNAUTHORIZED=0
+cd "Nutri Ninja 5.0\frontend"
+eas login
+eas build -p android --profile preview
 ```
 
-macOS/Linux:
+- Requires free Expo account at expo.dev
+- Build takes ~10–15 minutes on EAS cloud
+- A download link for the `.apk` is printed when done
 
-```bash
-bash build-setup.sh
-```
+## Local Development
 
-## Manual Setup
-
-Backend:
-
-```powershell
+**Backend:**
+```cmd
 cd backend
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+venv\Scripts\activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Frontend:
-
-```powershell
+**Frontend:**
+```cmd
 cd frontend
-npm install
-npm run web
+npx expo start
 ```
 
-## URLs
+Set `EXPO_PUBLIC_BACKEND_URL=http://YOUR_PC_IP:8000` in `frontend/.env`.
 
-- Frontend: http://localhost:8081
-- Backend: http://localhost:8000
-- API docs: http://localhost:8000/docs
+## Backend Deployment (Render.com)
 
-## Implemented API Endpoints
+Live at: `https://nutri-ninja-5-0.onrender.com`
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | `/` | API status |
-| GET | `/product/{barcode}` | Fetch product from Open Food Facts |
-| GET | `/search?query=` | Search products |
-| POST | `/analyze` | Generate health score, Nutri-Score, warnings and profile insights |
-| POST | `/recommendations` | Rank better and worse similar foods |
-| POST | `/label/analyze` | Analyze ingredient label text |
-| POST | `/user/profile/{user_id}` | Save profile |
-| GET | `/user/profile/{user_id}` | Load profile |
-| GET | `/history` | Return backend scan history |
+Render settings:
+- Root Directory: `backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Env vars: `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-1.5-flash`
 
 ## Verification
 
-Frontend:
-
-```powershell
+```cmd
 cd frontend
-.\node_modules\.bin\tsc.cmd --noEmit
+npx tsc --noEmit
 ```
 
-Backend:
-
-```powershell
+```cmd
 cd backend
-.\venv\Scripts\python.exe -m py_compile app\main.py
+venv\Scripts\python.exe -m py_compile app\main.py
 ```
-
-## Final UI Screens
-
-- Scan: barcode scanner, manual barcode entry, product search, suggestions and feature checklist.
-- History: scanned product history with health scores and add-to-basket action.
-- Profile: name, age, weight, health goal and allergies.
-- More: grocery basket analysis, comparison, calorie tracking, meal planner, voice assistant and OCR label reading.
-
-## Notes
-
-MongoDB Atlas and Redis are represented locally with in-memory storage for demonstration. The API boundaries are already prepared for replacing those stores with production services.

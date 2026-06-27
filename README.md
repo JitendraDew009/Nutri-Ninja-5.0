@@ -1,120 +1,211 @@
 # Nutri Ninja 5.0
 
-Nutri Ninja is an AI-powered nutrition assistant for packaged food analysis. Users can scan a barcode, search products, view health scores and warnings, compare alternatives, analyze a grocery basket, and get personalized recommendations.
+An AI-powered food scanner Android app. Scan any packaged food barcode, get instant health scores, ingredient warnings, personalized nutrition advice, and AI-powered diet chat — all stored locally on your phone.
+
+---
 
 ## Features
 
-- Exact mobile scan UI based on the Nutri Ninja system design mockup
-- Barcode scanning with Expo Camera
-- Product search using Open Food Facts
-- FastAPI backend gateway with search, analysis, recommendations, profile, history, and label analysis endpoints
-- Custom 1-100 health score
-- Nutri-Score style A-E grading
-- Sugar, salt, saturated fat, additive, and allergy warnings
-- Better and worse similar product recommendations
-- Personalized insights using user goal and allergies
-- Grocery basket health analysis
-- Food comparison dashboard
-- Bottom tabs for Scan, History, Profile, and More
-- Scan history
-- Daily calorie tracking
-- AI meal planner suggestions
-- Voice assistant panel for basket questions
-- OCR label reading panel through pasted ingredient text
+| Feature | Description |
+|---|---|
+| Barcode Scanner | Scan packaged food barcodes with the phone camera |
+| Product Search | Search millions of products by name or brand |
+| Health Score | Custom 1–100 score based on sugar, fat, salt, fiber, protein |
+| Nutri-Score | Official A–E grade display |
+| Nutrition Warnings | Flags high sugar, salt, saturated fat automatically |
+| Personalized Insights | Advice tailored to your goal (diabetes, weight loss, muscle gain, heart health) |
+| Grocery Basket | Add products, see basket-level health grade and AI analysis |
+| Scan History | Browse previously scanned products |
+| AI Diet Chat | Gemini-powered nutrition assistant (per product and general) |
+| Food Label OCR | Paste label text → AI analyzes ingredients |
+| Multi-Profile | Manage diet profiles for each family member |
+| Dark / Day Mode | Toggle from the profile or basket screen |
+| Local Storage | All data saved on the device — no account required |
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
-| --- | --- |
-| Mobile/Web App | React Native, Expo, Expo Router |
+|---|---|
+| Mobile App | React Native 0.85, Expo SDK 56, Expo Router |
 | Language | TypeScript |
-| Backend | FastAPI, Python |
-| API Client | Axios |
-| Camera | Expo Camera |
-| Data Source | Open Food Facts |
-| AI Logic | Custom heuristic scoring and recommendation engine |
+| Backend | FastAPI (Python), deployed on Render.com |
+| AI | Google Gemini 1.5 Flash |
+| Product Data | Open Food Facts API |
+| Local Storage | AsyncStorage (`@react-native-async-storage/async-storage`) |
+| HTTP Client | Axios |
+| Camera | expo-camera |
+| Build | EAS Build (Expo Application Services) |
+
+---
 
 ## Project Structure
 
-```text
+```
 Nutri Ninja 5.0/
-  backend/
-    app/main.py
-    requirements.txt
-  frontend/
-    src/app/index.tsx
-    src/app/history.tsx
-    src/app/profile.tsx
-    src/app/more.tsx
-    src/screens/
-    src/services/
-    src/utils/
-    package.json
-  BUILD_SETUP.md
-  START_SERVICES.md
-  README.md
+├── backend/
+│   ├── app/
+│   │   └── main.py          # FastAPI app — all endpoints
+│   ├── requirements.txt     # Python dependencies (UTF-8)
+│   ├── render.yaml          # Render.com deployment config
+│   └── .env                 # Local secrets (never commit)
+├── frontend/
+│   ├── src/
+│   │   ├── app/             # Expo Router screens (tabs)
+│   │   │   ├── _layout.tsx      # Root layout, store hydration
+│   │   │   ├── index.tsx        # Scan tab
+│   │   │   ├── history.tsx      # Ninja Hub tab
+│   │   │   ├── grocery-basket.tsx
+│   │   │   ├── explore.tsx      # AI Assistant tab
+│   │   │   └── profile.tsx      # Diet Profile tab
+│   │   ├── screens/
+│   │   │   ├── ScannerScreen.tsx
+│   │   │   └── ProductDetailScreen.tsx
+│   │   ├── components/
+│   │   │   ├── diet-advisor-chat.tsx
+│   │   │   ├── ocr-label-reader.tsx
+│   │   │   └── product-image.tsx
+│   │   ├── services/
+│   │   │   └── api.ts           # Backend + OpenFoodFacts client
+│   │   └── utils/
+│   │       ├── localStore.ts    # AsyncStorage persistence
+│   │       ├── healthScore.ts
+│   │       ├── recommendations.ts
+│   │       └── themeMode.tsx
+│   ├── app.json             # Expo config, Android permissions
+│   ├── eas.json             # EAS build config
+│   └── package.json
+└── README.md
 ```
 
-## Run The Project
+---
 
-Start the backend:
+## Backend — Local Development
 
-```powershell
+```bash
 cd backend
-.\venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+venv\Scripts\activate          # Windows
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Start the frontend:
+Backend runs at `http://localhost:8000`
+Swagger docs at `http://localhost:8000/docs`
 
-```powershell
+### Environment Variables (`backend/.env`)
+
+```env
+GEMINI_API_KEY=AIza...          # From https://aistudio.google.com/apikey
+GEMINI_MODEL=gemini-1.5-flash   # Default model
+```
+
+---
+
+## Backend — Production (Render.com)
+
+Deployed at: `https://nutri-ninja-5-0.onrender.com`
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/` | GET | Health check |
+| `/product/{barcode}` | GET | Fetch product from Open Food Facts |
+| `/search?query=` | GET | Search products |
+| `/analyze` | POST | Analyze product with user profile |
+| `/chat` | POST | Gemini AI nutrition chat |
+| `/chat/voice` | POST | Voice message to Gemini |
+| `/recommendations` | POST | Better/worse product suggestions |
+| `/label/analyze` | POST | Analyze pasted ingredient text |
+
+### Redeploy on Render
+
+1. Push to GitHub → Render auto-redeploys
+2. Or: Render dashboard → Manual Deploy
+
+---
+
+## Frontend — Android APK Build
+
+### Prerequisites
+- Node.js 18+
+- EAS CLI: `npm install -g eas-cli`
+- Expo account at expo.dev
+
+### Build APK
+
+```cmd
+# Windows — run in Command Prompt
+set NODE_TLS_REJECT_UNAUTHORIZED=0
 cd frontend
-npm run web
+eas login
+eas build -p android --profile preview
 ```
 
-Open:
+Download the `.apk` from the link EAS provides → install on Android.
 
-- App: http://localhost:8081
-- Backend API: http://localhost:8000
-- Swagger Docs: http://localhost:8000/docs
+### Build Config (`frontend/eas.json`)
 
-## Backend Endpoints
+```json
+{
+  "build": {
+    "preview": {
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://nutri-ninja-5-0.onrender.com"
+      }
+    }
+  }
+}
+```
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | `/` | API health and feature summary |
-| GET | `/product/{barcode}` | Fetch product by barcode |
-| GET | `/search?query=` | Search products |
-| POST | `/analyze` | Analyze product with optional profile |
-| POST | `/recommendations` | Rank better and worse products |
-| POST | `/label/analyze` | Analyze pasted ingredient label text |
-| POST | `/user/profile/{user_id}` | Save user profile |
-| GET | `/user/profile/{user_id}` | Fetch user profile |
-| GET | `/history` | Return scanned product history |
+---
 
-## Verification
+## Frontend — Local Development
 
-Frontend:
-
-```powershell
+```bash
 cd frontend
-.\node_modules\.bin\tsc.cmd --noEmit
+npm install
+npx expo start
 ```
 
-Backend:
+Press `a` to open on Android emulator, or scan the QR code with Expo Go.
 
-```powershell
-cd backend
-.\venv\Scripts\python.exe -m py_compile app\main.py
+Set `EXPO_PUBLIC_BACKEND_URL` in `frontend/.env` to your local backend IP:
+
+```env
+EXPO_PUBLIC_BACKEND_URL=http://192.168.X.X:8000
 ```
 
-## Project Status
+---
 
-Nutri Ninja 5.0 is complete for final project demonstration. Database and Redis are represented by in-memory backend stores for local demo use; the API boundaries are ready for MongoDB Atlas and Redis integration.
+## Data Storage
 
-## Final Screens
+All user data is stored **locally on the device** using AsyncStorage:
 
-- **Scan:** camera barcode scanner, barcode frame, manual barcode entry, product search, suggestions and feature checklist.
-- **History:** scan history with health scores and add-to-basket actions.
-- **Profile:** user details, health goal and allergy preferences.
-- **More:** basket analysis, comparison, calories, meal planner, voice assistant and OCR label analysis.
+| Key | Data |
+|---|---|
+| `familyProfiles` | Array of diet profiles |
+| `activeProfileId` | Currently active profile |
+| `scanHistory:{profileId}` | Per-profile scan history (max 30) |
+| `groceryBasket:{profileId}` | Per-profile basket (max 30) |
+| `themeModeV2` | `"dark"` or `"day"` |
+
+Data persists across app restarts. No account or internet needed for local features.
+
+---
+
+## Android Permissions
+
+| Permission | Reason |
+|---|---|
+| `CAMERA` | Barcode scanning |
+| `INTERNET` | Product lookup and AI chat |
+
+---
+
+## Known Limitations
+
+- **OCR image capture** — Tesseract.js is web-only. On Android, paste label text manually into the OCR screen.
+- **Voice chat** — Web Speech API is browser-only. Mic button is disabled on Android; use text chat instead.
+- **Render free tier** — Backend sleeps after 15 min of inactivity. First request after sleep may take ~30 sec. Subsequent requests are fast.
+- **Gemini free tier** — Limited to 15 requests/minute. If busy, retry after ~30 seconds.

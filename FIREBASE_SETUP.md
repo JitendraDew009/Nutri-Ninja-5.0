@@ -1,23 +1,16 @@
-# Firebase Authentication and Cloud Sync
+# Firebase — Not Used
 
-1. Open [Firebase Console](https://console.firebase.google.com/) and create a project.
-2. Add a Web app to the project.
-3. In **Authentication > Sign-in method**, enable **Email/Password**.
-4. Create a **Cloud Firestore** database.
-5. Publish the rules from `firestore.rules`.
-6. Copy `frontend/.env.example` to `frontend/.env`.
-7. Add the Firebase Web API key and project ID:
+Firebase authentication and cloud sync have been removed from Nutri Ninja 5.0.
 
-```env
-EXPO_PUBLIC_FIREBASE_API_KEY=your_web_api_key
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-```
+All user data (family profiles, scan history, grocery basket, theme preference) is stored
+**locally on the device** using `@react-native-async-storage/async-storage`.
 
-8. Restart the Expo frontend.
+No account, login, or internet connection is required to use the core features of the app.
 
-When configured, the app requires sign-in and synchronizes family profiles,
-per-profile scan history, and grocery baskets to:
+---
 
-```text
-users/{firebaseUserId}/appData/main
-```
+If you want to re-add Firebase cloud sync in the future:
+- Add `useAuth` context back via `auth-gate.tsx` (the file still exists in `src/components/`)
+- Re-wrap `<ThemedTabs />` with `<AuthGate>` in `src/app/_layout.tsx`
+- Add `EXPO_PUBLIC_FIREBASE_API_KEY` and `EXPO_PUBLIC_FIREBASE_PROJECT_ID` to `eas.json`
+- Enable Email/Password in Firebase Console → Authentication → Sign-in method

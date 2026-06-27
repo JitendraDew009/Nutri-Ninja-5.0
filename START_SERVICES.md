@@ -1,90 +1,53 @@
-# Nutri Ninja - Start Services
+# Start Services — Local Development
 
-## Windows (PowerShell)
+## Backend
 
-### 1. Start Backend Server
-```powershell
+```cmd
 cd backend
-Copy-Item .env.example .env
-# Edit .env and set GEMINI_API_KEY before using free-tier AI chat.
-.\venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+venv\Scripts\activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 2. Start Frontend (in new PowerShell window)
+Backend URLs:
+- API: http://localhost:8000
+- Swagger docs: http://localhost:8000/docs
 
-```powershell
+Make sure `backend/.env` has:
+```env
+GEMINI_API_KEY=AIza...
+GEMINI_MODEL=gemini-1.5-flash
+```
+
+## Frontend
+
+```cmd
 cd frontend
-npm run web
+npx expo start
 ```
 
----
+- Press `a` — opens on Android emulator
+- Press `w` — opens in browser
+- Scan QR code with Expo Go app on physical Android device
 
-## macOS / Linux (Bash)
-
-### 1. Start Backend Server
-```bash
-cd backend
-cp .env.example .env
-# Edit .env and set GEMINI_API_KEY before using free-tier AI chat.
-source venv/bin/activate
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+Create `frontend/.env` with your PC's local IP:
+```env
+EXPO_PUBLIC_BACKEND_URL=http://192.168.X.X:8000
 ```
 
-### 2. Start Frontend (in new terminal)
+## Quick API Test
 
 ```bash
-cd frontend
-npm run web
+curl https://nutri-ninja-5-0.onrender.com/
+curl https://nutri-ninja-5-0.onrender.com/product/5000112126957
+curl "https://nutri-ninja-5-0.onrender.com/search?query=bread"
 ```
-
----
-
-## Quick URL References
-
-Once both are running:
-
-| Service | URL | Purpose |
-|---------|-----|---------|
-| Backend API | http://localhost:8000 | API endpoint |
-| API Documentation | http://localhost:8000/docs | Interactive Swagger UI |
-| ReDoc | http://localhost:8000/redoc | Alternative API docs |
-| Frontend (Expo Web) | http://localhost:8081 | Web version of app |
-
----
-
-## Testing API Endpoints
-
-Using curl (or Postman):
-
-```bash
-# Test home endpoint
-curl http://localhost:8000/
-
-# Test product lookup
-curl http://localhost:8000/product/5000112126957
-
-# Search products
-curl "http://localhost:8000/search?query=bread"
-
-# Analyze ingredient label text
-curl -X POST http://localhost:8000/label/analyze -H "Content-Type: application/json" -d "{\"text\":\"whole wheat, sugar, sodium benzoate\",\"allergies\":\"\"}"
-```
-
----
 
 ## Troubleshooting
 
-**Backend won't start:**
-- Check port 8000 is not in use: `netstat -an | findstr 8000` (Windows) or `lsof -i :8000` (Mac/Linux)
-- Use different port: `uvicorn app.main:app --reload --port 8001`
-
-**Frontend won't start:**
-- Clear cache: `npm run reset-project`
-- Reinstall: `rm -r node_modules package-lock.json && npm install`
-
-**API connection timeout:**
-- Ensure backend is running
-- Check firewall/antivirus isn't blocking port 8000
-- Verify API URL in frontend is correct
-
+| Problem | Fix |
+|---|---|
+| Backend port 8000 in use | `netstat -an \| findstr 8000` then kill the process |
+| Frontend cache issues | `npx expo start --clear` |
+| Phone can't reach local backend | Make sure phone and PC are on the same Wi-Fi |
+| Gemini returns 429 | Wait 30–60 seconds (free tier rate limit) |
+| Render backend slow first response | First request after 15 min sleep takes ~30 sec — normal |
