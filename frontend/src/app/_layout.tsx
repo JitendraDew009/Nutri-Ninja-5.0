@@ -4,7 +4,6 @@ import { SymbolView } from "expo-symbols";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ThemeModeProvider, useThemeMode } from "../utils/themeMode";
-import { AuthGate } from "../components/auth-gate";
 import { hydrateStore } from "../utils/localStore";
 
 export default function Layout() {
@@ -20,9 +19,7 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <ThemeModeProvider>
-        <AuthGate>
-          <ThemedTabs />
-        </AuthGate>
+        <ThemedTabs />
       </ThemeModeProvider>
     </SafeAreaProvider>
   );

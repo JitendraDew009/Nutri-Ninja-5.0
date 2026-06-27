@@ -11,7 +11,6 @@ import {
   saveFamilyProfiles,
 } from "../utils/localStore";
 import { ThemeToggle, useThemeMode } from "../utils/themeMode";
-import { useAuth } from "../components/auth-gate";
 
 const goals: Array<{ key: UserProfile["goal"]; label: string }> = [
   { key: "general", label: "General wellness" },
@@ -33,7 +32,6 @@ const restrictions = ["Vegetarian", "Vegan", "Gluten-Free", "Dairy-Free", "Low-S
 
 export default function ProfileScreen() {
   const { palette } = useThemeMode();
-  const { session, signOut } = useAuth();
   const [profiles, setProfiles] = useState<UserProfile[]>(getFamilyProfiles);
   const [activeId, setActiveId] = useState(getActiveProfile().id);
   const [editingId, setEditingId] = useState(getActiveProfile().id);
@@ -113,21 +111,6 @@ export default function ProfileScreen() {
           <ThemeToggle />
         </View>
 
-        {session ? (
-          <View style={[styles.accountCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <View style={[styles.accountIcon, { backgroundColor: palette.surfaceSoft }]}>
-              <SymbolView name={{ ios: "cloud.fill", android: "cloud_done", web: "cloud_done" }} tintColor={palette.accentBright} size={24} />
-            </View>
-            <View style={styles.accountCopy}>
-              <Text style={[styles.accountTitle, { color: palette.text }]}>Cloud sync active</Text>
-              <Text style={[styles.accountEmail, { color: palette.muted }]}>{session.email}</Text>
-            </View>
-            <TouchableOpacity style={[styles.signOutButton, { borderColor: palette.border }]} onPress={signOut}>
-              <SymbolView name={{ ios: "rectangle.portrait.and.arrow.right", android: "logout", web: "logout" }} tintColor={palette.danger} size={20} />
-              <Text style={[styles.signOutText, { color: palette.danger }]}>Sign out</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
 
         <View style={styles.profileStrip}>
           {profiles.map((profile) => (

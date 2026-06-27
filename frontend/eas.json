@@ -10,8 +10,8 @@
       },
       "env": {
         "EXPO_PUBLIC_BACKEND_URL": "https://nutri-ninja-5-0.onrender.com",
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCZ8M7hphp6KbL-iNBqvPEVpczx8D7MKOA",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "nutri-ninja"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": ""
       }
     },
     "production": {
@@ -20,8 +20,8 @@
       },
       "env": {
         "EXPO_PUBLIC_BACKEND_URL": "https://nutri-ninja-5-0.onrender.com",
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCZ8M7hphp6KbL-iNBqvPEVpczx8D7MKOA",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "nutri-ninja"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": ""
       }
     }
   }
