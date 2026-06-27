@@ -90,6 +90,8 @@ OPENAI_API_BASE = "https://api.openai.com/v1"
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+ANTHROPIC_API_BASE = "https://api.anthropic.com/v1"
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 
 def health_score(product: dict[str, Any]) -> int:
@@ -270,6 +272,40 @@ def build_system_prompt(profile: dict[str, Any]) -> str:
     )
 
 
+def _try_claude(messages: list[dict[str, Any]], profile: dict[str, Any]) -> str | None:
+    """Try Claude (Anthropic). Returns answer string or None if unavailable."""
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        claude_messages = [
+            {"role": m["role"], "content": m["content"].strip()}
+            for m in messages if m.get("content", "").strip()
+        ]
+        r = requests.post(
+            f"{ANTHROPIC_API_BASE}/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": ANTHROPIC_MODEL,
+                "max_tokens": 400,
+                "system": build_system_prompt(profile),
+                "messages": claude_messages,
+            },
+            timeout=60,
+        )
+        if r.status_code == 200:
+            content = r.json().get("content", [])
+            answer = " ".join(block.get("text", "") for block in content if block.get("type") == "text").strip()
+            return answer if answer else None
+        return None
+    except Exception:
+        return None
+
+
 def _try_openai(messages: list[dict[str, Any]], profile: dict[str, Any]) -> str | None:
     """Try OpenAI. Returns answer string or None if unavailable/no credits."""
     api_key = os.getenv("OPENAI_API_KEY", "")
@@ -329,8 +365,12 @@ def _try_gemini(messages: list[dict[str, Any]], profile: dict[str, Any]) -> str 
 
 
 def call_openai_chat(messages: list[dict[str, Any]], profile: dict[str, Any] | None) -> str:
-    """Try OpenAI first, fall back to Gemini automatically."""
+    """Try Claude first, then OpenAI, then Gemini — uses whichever key works."""
     profile = profile or {}
+
+    answer = _try_claude(messages, profile)
+    if answer:
+        return answer
 
     answer = _try_openai(messages, profile)
     if answer:
@@ -342,11 +382,7 @@ def call_openai_chat(messages: list[dict[str, Any]], profile: dict[str, Any] | N
 
     raise HTTPException(
         status_code=503,
-        detail=(
-            "AI assistant is not available right now. "
-            "Please add OPENAI_API_KEY (with billing) or GEMINI_API_KEY (from aistudio.google.com/apikey) "
-            "in Render environment variables."
-        ),
+        detail="AI assistant unavailable. Check ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY in Render environment variables.",
     )
 
 
@@ -486,6 +522,9 @@ def test_ai():
     openai_ok = _try_openai(test_msgs, profile)
     gemini_ok = _try_gemini(test_msgs, profile)
 
+    claude_ok = _try_claude(test_msgs, profile)
+    if claude_ok:
+        return {"status": "ok", "provider": "Claude (Anthropic)", "model": ANTHROPIC_MODEL, "reply": claude_ok}
     if openai_ok:
         return {"status": "ok", "provider": "OpenAI", "model": OPENAI_MODEL, "reply": openai_ok}
     if gemini_ok:
@@ -493,10 +532,7 @@ def test_ai():
 
     return {
         "status": "error",
-        "openai": "no credits or invalid key" if os.getenv("OPENAI_API_KEY") else "OPENAI_API_KEY not set",
-        "gemini": "quota 0 or invalid key" if os.getenv("GEMINI_API_KEY") else "GEMINI_API_KEY not set",
-        "fix": (
-            "Option A: Add billing at platform.openai.com then update OPENAI_API_KEY on Render. "
-            "Option B: Get a free key from aistudio.google.com/apikey and set GEMINI_API_KEY on Render."
-        ),
+        "claude": "invalid key" if os.getenv("ANTHROPIC_API_KEY") else "ANTHROPIC_API_KEY not set",
+        "openai": "no credits" if os.getenv("OPENAI_API_KEY") else "OPENAI_API_KEY not set",
+        "gemini": "quota issue" if os.getenv("GEMINI_API_KEY") else "GEMINI_API_KEY not set",
     }
