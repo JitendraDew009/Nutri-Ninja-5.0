@@ -4,6 +4,22 @@ An AI-powered food scanner Android app. Scan any packaged food barcode, get inst
 
 ---
 
+## Demo
+
+[Watch the Nutri Ninja demo video](https://lnkd.in/p/d9QA53uW)
+
+## Screenshots
+
+<p align="center">
+  <img src="Screenshots/HOME%20SCREEN.jpeg" alt="Nutri Ninja home screen" width="180" />
+  <img src="Screenshots/Family%20Basket.png" alt="Family grocery basket" width="180" />
+  <img src="Screenshots/CHAT%20ASSISTANT.jpeg" alt="AI chat assistant" width="180" />
+  <img src="Screenshots/DIET%20PROFILE.jpeg" alt="Diet profile" width="180" />
+  <img src="Screenshots/DIET%20PROFILE2.jpeg" alt="Diet profile settings" width="180" />
+</p>
+
+---
+
 ## Features
 
 | Feature | Description |
