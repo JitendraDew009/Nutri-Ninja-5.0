@@ -8,6 +8,10 @@ An AI-powered food scanner Android app. Scan any packaged food barcode, get inst
 
 [Watch the Nutri Ninja demo video](https://lnkd.in/p/d9QA53uW)
 
+**Status:** MVP complete | Android APK build configured | Backend deployed
+
+**Try it:** Build the installable Android APK with the [`preview` EAS profile](frontend/eas.json#L8-L16). The build steps are documented in [Frontend — Android APK Build](#frontend--android-apk-build).
+
 ## Screenshots
 
 <p align="center">
@@ -37,6 +41,32 @@ An AI-powered food scanner Android app. Scan any packaged food barcode, get inst
 | Multi-Profile | Manage diet profiles for each family member |
 | Dark / Day Mode | Toggle from the profile or basket screen |
 | Local Storage | All data saved on the device — no account required |
+
+---
+
+## Technical Highlights
+
+- Built an offline-first mobile experience with per-profile scan history and grocery baskets stored in AsyncStorage.
+- Designed a custom 1–100 health-score algorithm combining sugar, fat, salt, fiber, and protein values.
+- Integrated Open Food Facts for product data and Gemini for personalized nutrition analysis, recommendations, and chat.
+- Added barcode scanning, ingredient-label analysis, diet profiles, accessibility-friendly themes, and voice-ready chat flows.
+- Deployed a FastAPI backend on Render with separate endpoints for products, analysis, chat, recommendations, and label analysis.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  App[React Native + Expo app]
+  Storage[(AsyncStorage)]
+  API[FastAPI backend]
+  OFF[Open Food Facts API]
+  Gemini[Google Gemini]
+
+  App --> Storage
+  App --> API
+  API --> OFF
+  API --> Gemini
+```
 
 ---
 
@@ -107,6 +137,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Backend runs at `http://localhost:8000`
+
 Swagger docs at `http://localhost:8000/docs`
 
 ### Environment Variables (`backend/.env`)
@@ -121,6 +152,8 @@ GEMINI_MODEL=gemini-1.5-flash   # Default model
 ## Backend — Production (Render.com)
 
 Deployed at: `https://nutri-ninja-5-0.onrender.com`
+
+> Note: The Render free tier sleeps after inactivity. The first request after sleep can take around 30 seconds; later requests are faster.
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -157,7 +190,7 @@ eas login
 eas build -p android --profile preview
 ```
 
-Download the `.apk` from the link EAS provides → install on Android.
+Download the `.apk` from the link EAS provides and install it on Android. An APK release URL is not committed to this repository yet.
 
 ### Build Config (`frontend/eas.json`)
 
